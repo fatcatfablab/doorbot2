@@ -6,39 +6,43 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/fatcatfablab/doorbot2/db"
 )
 
 var (
-	addr   = flag.String("addr", ":8443", "Address to listen on")
-	secure = flag.Bool("secure", true, "Whether to use TLS")
-	cert   = flag.String("cert", "certs/cert.pem", "Path to the certificate")
-	key    = flag.String("key", "certs/key.pem", "Path to the private key")
+	addr     = flag.String("addr", ":8443", "Address to listen on")
+	secure   = flag.Bool("secure", true, "Whether to use TLS")
+	cert     = flag.String("cert", "certs/cert.pem", "Path to the certificate")
+	key      = flag.String("key", "certs/key.pem", "Path to the private key")
+	dbPath   = flag.String("dbPath", "access.sqlite", "Path to the sqlite3 database")
+	accessDb *db.DB
 )
 
-type Msg struct {
-	Event         string  `json:"event"`
-	EventObjectId string  `json:"event_object_id"`
-	Data          MsgData `json:"data"`
+type UdmMsg struct {
+	Event         string     `json:"event"`
+	EventObjectId string     `json:"event_object_id"`
+	Data          UdmMsgData `json:"data"`
 }
 
-type MsgData struct {
+type UdmMsgData struct {
 	Location map[string]any `json:"location"`
 	Device   map[string]any `json:"device"`
-	Actor    *Actor         `json:"actor"`
+	Actor    *UdmActor      `json:"actor"`
 	Object   map[string]any `json:"object"`
 }
 
-type Actor struct {
+type UdmActor struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
 
-func handler(w http.ResponseWriter, req *http.Request) {
+func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
 	fmt.Println("req received!")
 
 	j := json.NewDecoder(req.Body)
-	msg := Msg{}
+	msg := UdmMsg{}
 	if err := j.Decode(&msg); err != nil {
 		log.Printf("error parsing message: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -53,18 +57,41 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func handleUpdateRequest(w http.ResponseWriter, req *http.Request) {
+	j := json.NewDecoder(req.Body)
+	r := db.AccessRecord{}
+	if err := j.Decode(&r); err != nil {
+		log.Printf("error decoding override request: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if _, err := accessDb.Update(r); err != nil {
+		log.Printf("error updating db: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	flag.Parse()
 
+	var err error
+	accessDb, err = db.New(*dbPath)
+	if err != nil {
+		log.Fatalf("error opening database: %s", err)
+	}
+	defer accessDb.Close()
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /{$}", handler)
+	mux.HandleFunc("POST /{$}", handleUdmRequest)
+	mux.HandleFunc("POST /override{$}", handleUpdateRequest)
 
 	s := &http.Server{
 		Addr:    *addr,
 		Handler: mux,
 	}
 
-	var err error
 	log.Printf("Server listening on %q", *addr)
 	if *secure {
 		log.Printf("Listener will use TLS")
