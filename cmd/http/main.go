@@ -9,7 +9,10 @@ import (
 )
 
 var (
-	addr = flag.String("addr", ":8080", "Address to listen on")
+	addr   = flag.String("addr", ":8443", "Address to listen on")
+	secure = flag.Bool("secure", true, "Whether to use TLS")
+	cert   = flag.String("cert", "certs/cert.pem", "Path to the certificate")
+	key    = flag.String("key", "certs/key.pem", "Path to the private key")
 )
 
 type Msg struct {
@@ -61,8 +64,15 @@ func main() {
 		Handler: mux,
 	}
 
+	var err error
 	log.Printf("Server listening on %q", *addr)
-	if err := s.ListenAndServe(); err != nil {
+	if *secure {
+		log.Printf("Listener will use TLS")
+		err = s.ListenAndServeTLS(*cert, *key)
+	} else {
+		err = s.ListenAndServe()
+	}
+	if err != nil {
 		panic(err)
 	}
 }
