@@ -1,6 +1,7 @@
 package db
 
 import (
+	"log"
 	"path"
 	"testing"
 	"time"
@@ -24,7 +25,6 @@ func TestBump(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error loading timezone: %s", err)
 	}
-	originTs := time.Date(2025, 1, 16, 0, 0, 0, 0, loc)
 
 	for _, tt := range []struct {
 		name string
@@ -32,19 +32,27 @@ func TestBump(t *testing.T) {
 	}{
 		{
 			name: "First bump",
-			want: AccessRecord{Name: username, Total: 1, Streak: 1, Timestamp: originTs},
+			want: AccessRecord{Name: username, Total: 1, Streak: 1, Timestamp: time.Date(2025, 1, 16, 0, 0, 0, 0, loc)},
 		},
 		{
 			name: "Bump in the same day",
-			want: AccessRecord{Name: username, Total: 1, Streak: 1, Timestamp: originTs.Add(1 * time.Hour)},
+			want: AccessRecord{Name: username, Total: 1, Streak: 1, Timestamp: time.Date(2025, 1, 16, 1, 0, 0, 0, loc)},
 		},
 		{
 			name: "Bump the next day",
-			want: AccessRecord{Name: username, Total: 2, Streak: 2, Timestamp: originTs.Add(24 * time.Hour)},
+			want: AccessRecord{Name: username, Total: 2, Streak: 2, Timestamp: time.Date(2025, 1, 17, 13, 0, 0, 0, loc)},
 		},
 		{
-			name: "Bump next week",
-			want: AccessRecord{Name: username, Total: 3, Streak: 1, Timestamp: originTs.Add(7 * 24 * time.Hour)},
+			name: "Bump the same day again",
+			want: AccessRecord{Name: username, Total: 2, Streak: 2, Timestamp: time.Date(2025, 1, 17, 14, 0, 0, 0, loc)},
+		},
+		{
+			name: "Bump the next day again",
+			want: AccessRecord{Name: username, Total: 3, Streak: 3, Timestamp: time.Date(2025, 1, 18, 13, 0, 0, 0, loc)},
+		},
+		{
+			name: "Break streak",
+			want: AccessRecord{Name: username, Total: 4, Streak: 1, Timestamp: time.Date(2025, 1, 25, 12, 0, 0, 0, loc)},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,7 +62,9 @@ func TestBump(t *testing.T) {
 			}
 
 			if !got.Equal(tt.want) {
-				t.Errorf("records do not match. Got: %v Want: %v", got, tt.want)
+				log.Printf("want: %+v", tt.want)
+				log.Printf("got:  %+v", got)
+				t.Error("records do not match")
 			}
 		})
 	}

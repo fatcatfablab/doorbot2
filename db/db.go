@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -29,8 +30,18 @@ type AccessRecord struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+type date struct {
+	year  int
+	month time.Month
+	day   int
+}
+
 type DB struct {
 	db *sql.DB
+}
+
+func newDate(year int, month time.Month, day int) date {
+	return date{year: year, month: month, day: day}
 }
 
 func New(path string) (*DB, error) {
@@ -94,19 +105,20 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 		r.Streak = 1
 	}
 
-	rYear, rMonth, rDay := r.Timestamp.Date()
-	tsYear, tsMonth, tsDay := ts.Date()
-	if rYear != tsYear || rMonth != tsMonth || rDay != tsDay {
+	lastVisit := newDate(r.Timestamp.Date())
+	log.Printf("lastVisit: %+v", lastVisit)
+	thisVisit := newDate(ts.Date())
+	log.Printf("thisVisit: %+v", thisVisit)
+	if thisVisit != lastVisit {
 		// This is a different day from the last visit, so bump the total
 		r.Total += 1
 	}
 
-	nYear, nMonth, nDay := ts.Add(-24 * time.Hour).Date()
-	if rYear == nYear && rMonth == nMonth && rDay == nDay {
-		// There's only a difference of 24h from the last visit, so bump the
-		// streak
+	dayBefore := newDate(ts.Add(-24 * time.Hour).Date())
+	log.Printf("dayBefore: %+v", dayBefore)
+	if lastVisit == dayBefore {
 		r.Streak += 1
-	} else {
+	} else if thisVisit != lastVisit {
 		r.Streak = 1
 	}
 
