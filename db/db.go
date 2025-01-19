@@ -100,35 +100,34 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 	}
 
 	if r.Last.IsZero() {
-		r.Last = ts
 		r.Total = 1
 		r.Streak = 1
-	}
+	} else {
+		lastVisit := newDate(r.Last.Date())
+		log.Printf("lastVisit: %+v", lastVisit)
+		thisVisit := newDate(ts.Date())
+		log.Printf("thisVisit: %+v", thisVisit)
+		if thisVisit != lastVisit {
+			// This is a different day from the last visit, so bump the total
+			r.Total += 1
+		}
 
-	lastVisit := newDate(r.Last.Date())
-	log.Printf("lastVisit: %+v", lastVisit)
-	thisVisit := newDate(ts.Date())
-	log.Printf("thisVisit: %+v", thisVisit)
-	if thisVisit != lastVisit {
-		// This is a different day from the last visit, so bump the total
-		r.Total += 1
-	}
-
-	dayBefore := newDate(ts.Add(-24 * time.Hour).Date())
-	log.Printf("dayBefore: %+v", dayBefore)
-	if lastVisit == dayBefore {
-		r.Streak += 1
-	} else if thisVisit != lastVisit {
-		r.Streak = 1
+		dayBefore := newDate(ts.Add(-24 * time.Hour).Date())
+		log.Printf("dayBefore: %+v", dayBefore)
+		if lastVisit == dayBefore {
+			// Last visit was the day before, so bump the streak
+			r.Streak += 1
+		} else if lastVisit != thisVisit {
+			// Reset the streak
+			r.Streak = 1
+		}
 	}
 
 	r.Last = ts
-
 	r, err = db.Update(r)
 	if err != nil {
 		return AccessRecord{}, fmt.Errorf("error updating record: %w", err)
 	}
-
 	return r, nil
 }
 
