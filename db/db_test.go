@@ -2,7 +2,6 @@ package db
 
 import (
 	"log"
-	"path"
 	"testing"
 	"time"
 )
@@ -12,16 +11,14 @@ const (
 )
 
 func TestBumpWithTimestamp(t *testing.T) {
-	db, err := New(path.Join(t.TempDir(), "test-bump.sqlite"))
-	if err != nil {
-		t.Fatalf("error opening database: %s", err)
-	}
-
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
 		t.Fatalf("error loading timezone: %s", err)
 	}
 
+	prevAccessRecord := AccessRecord{
+		Name: username,
+	}
 	for _, tt := range []struct {
 		name string
 		want AccessRecord
@@ -52,16 +49,13 @@ func TestBumpWithTimestamp(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := db.bumpWithTimestamp(username, tt.want.Last)
-			if err != nil {
-				t.Fatalf("error bumping username: %s", err)
-			}
-
+			got := bumpRecord(prevAccessRecord, tt.want.Last)
 			if got != tt.want {
 				log.Printf("want: %+v", tt.want)
 				log.Printf("got:  %+v", got)
 				t.Error("records do not match")
 			}
+			prevAccessRecord = got
 		})
 	}
 }

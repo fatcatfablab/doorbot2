@@ -90,15 +90,19 @@ func (db *DB) Update(r AccessRecord) (AccessRecord, error) {
 }
 
 func (db *DB) Bump(name string) (AccessRecord, error) {
-	return db.bumpWithTimestamp(name, time.Now())
-}
-
-func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error) {
 	r, err := db.Get(name)
 	if err != nil {
 		return AccessRecord{}, fmt.Errorf("error retrieving record: %w", err)
 	}
 
+	r, err = db.Update(bumpRecord(r, time.Now()))
+	if err != nil {
+		return AccessRecord{}, fmt.Errorf("error updating record: %w", err)
+	}
+	return r, nil
+}
+
+func bumpRecord(r AccessRecord, ts time.Time) AccessRecord {
 	if r.Last.IsZero() {
 		r.Total = 1
 		r.Streak = 1
@@ -124,11 +128,7 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 	}
 
 	r.Last = ts
-	r, err = db.Update(r)
-	if err != nil {
-		return AccessRecord{}, fmt.Errorf("error updating record: %w", err)
-	}
-	return r, nil
+	return r
 }
 
 func (db *DB) Get(name string) (AccessRecord, error) {
