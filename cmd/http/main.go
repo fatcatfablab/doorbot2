@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/fatcatfablab/doorbot2/db"
 )
@@ -39,9 +40,9 @@ type UdmActor struct {
 }
 
 func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("req received!")
-
-	j := json.NewDecoder(req.Body)
+	sb := &strings.Builder{}
+	j := json.NewDecoder(io.TeeReader(req.Body, sb))
+	log.Print("Udm request received: " + sb.String())
 	msg := UdmMsg{}
 	if err := j.Decode(&msg); err != nil {
 		log.Printf("error parsing message: %s", err)
@@ -49,16 +50,18 @@ func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Printf("%+v\n", msg)
-	if msg.Data.Actor != nil {
-		fmt.Printf("%+v\n", msg.Data.Actor)
+	if _, err := accessDb.Bump(msg.Data.Actor.Name); err != nil {
+		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-
 	w.WriteHeader(http.StatusOK)
 }
 
 func handleUpdateRequest(w http.ResponseWriter, req *http.Request) {
-	j := json.NewDecoder(req.Body)
+	sb := &strings.Builder{}
+	j := json.NewDecoder(io.TeeReader(req.Body, sb))
+	log.Print("Update received: " + sb.String())
 	r := db.AccessRecord{}
 	if err := j.Decode(&r); err != nil {
 		log.Printf("error decoding override request: %s", err)
@@ -85,7 +88,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /{$}", handleUdmRequest)
-	mux.HandleFunc("POST /override{$}", handleUpdateRequest)
+	mux.HandleFunc("POST /update{$}", handleUpdateRequest)
 
 	s := &http.Server{
 		Addr:    *addr,
