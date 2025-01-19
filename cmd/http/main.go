@@ -62,7 +62,7 @@ func handleUpdateRequest(w http.ResponseWriter, req *http.Request) {
 	sb := &strings.Builder{}
 	j := json.NewDecoder(io.TeeReader(req.Body, sb))
 	log.Print("Update received: " + sb.String())
-	r := db.AccessRecord{}
+	r := db.Stats{}
 	if err := j.Decode(&r); err != nil {
 		log.Printf("error decoding override request: %s", err)
 		w.WriteHeader(http.StatusBadRequest)

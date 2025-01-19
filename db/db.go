@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS stats (
 ) STRICT;`
 )
 
-type AccessRecord struct {
+type Stats struct {
 	Name   string    `json:"name"`
 	Total  uint      `json:"total"`
 	Streak uint      `json:"streak"`
@@ -74,7 +74,7 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) Update(r AccessRecord) (AccessRecord, error) {
+func (db *DB) Update(r Stats) (Stats, error) {
 	_, err := db.db.Exec(
 		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
 			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, last=?`,
@@ -89,20 +89,20 @@ func (db *DB) Update(r AccessRecord) (AccessRecord, error) {
 	return r, err
 }
 
-func (db *DB) Bump(name string) (AccessRecord, error) {
+func (db *DB) Bump(name string) (Stats, error) {
 	r, err := db.Get(name)
 	if err != nil {
-		return AccessRecord{}, fmt.Errorf("error retrieving record: %w", err)
+		return Stats{}, fmt.Errorf("error retrieving record: %w", err)
 	}
 
-	r, err = db.Update(bumpRecord(r, time.Now()))
+	r, err = db.Update(bumpStats(r, time.Now()))
 	if err != nil {
-		return AccessRecord{}, fmt.Errorf("error updating record: %w", err)
+		return Stats{}, fmt.Errorf("error updating record: %w", err)
 	}
 	return r, nil
 }
 
-func bumpRecord(r AccessRecord, ts time.Time) AccessRecord {
+func bumpStats(r Stats, ts time.Time) Stats {
 	if r.Last.IsZero() {
 		r.Total = 1
 		r.Streak = 1
@@ -131,22 +131,22 @@ func bumpRecord(r AccessRecord, ts time.Time) AccessRecord {
 	return r
 }
 
-func (db *DB) Get(name string) (AccessRecord, error) {
+func (db *DB) Get(name string) (Stats, error) {
 	rows, err := db.db.Query(
 		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
 	)
 	if err != nil {
-		return AccessRecord{}, fmt.Errorf("error querying record: %w", err)
+		return Stats{}, fmt.Errorf("error querying record: %w", err)
 	}
 
-	r := AccessRecord{
+	r := Stats{
 		Name: name,
 	}
 	for rows.Next() {
 		var ts int64
 		if err := rows.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
-			return AccessRecord{}, fmt.Errorf("error scanning row: %w", err)
+			return Stats{}, fmt.Errorf("error scanning row: %w", err)
 		}
 		r.Last = time.Unix(ts, 0)
 		break
