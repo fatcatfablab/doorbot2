@@ -14,20 +14,20 @@ const (
 	tz       = "America/New_York"
 	driver   = "sqlite3"
 	initStmt = `
-CREATE TABLE IF NOT EXISTS records (
+CREATE TABLE IF NOT EXISTS stats (
        name TEXT NOT NULL,
        total INTEGER NOT NULL,
 	   streak INTEGER NOT NULL,
-	   timestamp INTEGER NOT NULL,
+	   last INTEGER NOT NULL,
        PRIMARY KEY (name)
 ) STRICT;`
 )
 
 type AccessRecord struct {
-	Name      string    `json:"name"`
-	Total     uint      `json:"total"`
-	Streak    uint      `json:"streak"`
-	Timestamp time.Time `json:"timestamp"`
+	Name   string    `json:"name"`
+	Total  uint      `json:"total"`
+	Streak uint      `json:"streak"`
+	Last   time.Time `json:"last"`
 }
 
 type date struct {
@@ -76,15 +76,15 @@ func (db *DB) Close() error {
 
 func (db *DB) Update(r AccessRecord) (AccessRecord, error) {
 	_, err := db.db.Exec(
-		`INSERT INTO records(name, total, streak, timestamp) VALUES (?, ?, ?, ?)`+
-			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, timestamp=?`,
+		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
+			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, last=?`,
 		r.Name,
 		r.Total,
 		r.Streak,
-		r.Timestamp.Unix(),
+		r.Last.Unix(),
 		r.Total,
 		r.Streak,
-		r.Timestamp.Unix(),
+		r.Last.Unix(),
 	)
 	return r, err
 }
@@ -99,13 +99,13 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 		return AccessRecord{}, fmt.Errorf("error retrieving record: %w", err)
 	}
 
-	if r.Timestamp.IsZero() {
-		r.Timestamp = ts
+	if r.Last.IsZero() {
+		r.Last = ts
 		r.Total = 1
 		r.Streak = 1
 	}
 
-	lastVisit := newDate(r.Timestamp.Date())
+	lastVisit := newDate(r.Last.Date())
 	log.Printf("lastVisit: %+v", lastVisit)
 	thisVisit := newDate(ts.Date())
 	log.Printf("thisVisit: %+v", thisVisit)
@@ -122,7 +122,7 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 		r.Streak = 1
 	}
 
-	r.Timestamp = ts
+	r.Last = ts
 
 	r, err = db.Update(r)
 	if err != nil {
@@ -134,7 +134,7 @@ func (db *DB) bumpWithTimestamp(name string, ts time.Time) (AccessRecord, error)
 
 func (db *DB) Get(name string) (AccessRecord, error) {
 	rows, err := db.db.Query(
-		"SELECT name, total, streak, timestamp FROM records WHERE name = ?",
+		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
 	)
 	if err != nil {
@@ -149,7 +149,7 @@ func (db *DB) Get(name string) (AccessRecord, error) {
 		if err := rows.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
 			return AccessRecord{}, fmt.Errorf("error scanning row: %w", err)
 		}
-		r.Timestamp = time.Unix(ts, 0)
+		r.Last = time.Unix(ts, 0)
 		break
 	}
 
