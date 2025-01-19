@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -132,24 +133,21 @@ func bumpStats(r Stats, ts time.Time) Stats {
 }
 
 func (db *DB) Get(name string) (Stats, error) {
-	rows, err := db.db.Query(
+	row := db.db.QueryRow(
 		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
 	)
-	if err != nil {
-		return Stats{}, fmt.Errorf("error querying record: %w", err)
-	}
 
-	r := Stats{
-		Name: name,
-	}
-	for rows.Next() {
-		var ts int64
-		if err := rows.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
+	var r Stats
+	var ts int64
+	if err := row.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.Name = name
+		} else {
 			return Stats{}, fmt.Errorf("error scanning row: %w", err)
 		}
+	} else {
 		r.Last = time.Unix(ts, 0)
-		break
 	}
 
 	return r, nil

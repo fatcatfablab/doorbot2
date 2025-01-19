@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"path"
 	"testing"
 	"time"
 )
@@ -56,6 +57,57 @@ func TestBumpStats(t *testing.T) {
 				t.Error("records do not match")
 			}
 			prevStats = got
+		})
+	}
+}
+
+func TestUpdateAndGet(t *testing.T) {
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		t.Fatalf("error loading timezone: %s", err)
+	}
+
+	ttime := time.Date(2025, 1, 17, 13, 0, 0, 0, loc)
+	for _, s := range []Stats{
+		{Name: "X", Total: 9, Streak: 8, Last: ttime},
+		{Name: "Y", Total: 6, Streak: 1, Last: ttime},
+		{Name: "Z", Total: 1, Streak: 1, Last: ttime},
+	} {
+		_, err := db.Update(s)
+		if err != nil {
+			t.Fatalf("error updating db: %s", err)
+		}
+	}
+
+	for _, tt := range []struct {
+		name string
+		want Stats
+	}{
+		{
+			name: "Get unexistent member",
+			want: Stats{Name: "A"},
+		},
+		{
+			name: "Get existing member",
+			want: Stats{Name: "X", Total: 9, Streak: 8, Last: ttime},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := db.Get(tt.want.Name)
+			if err != nil {
+				t.Fatalf("error getting stats: %s", err)
+			}
+			// time.Time objects can't be compared without ensuring they
+			// share location (same exact location object)
+			got.Last = got.Last.In(tt.want.Last.Location())
+			if got != tt.want {
+				t.Fatal("stats differ")
+			}
 		})
 	}
 }
