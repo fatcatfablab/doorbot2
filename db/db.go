@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -75,8 +76,9 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) Update(r Stats) (Stats, error) {
-	_, err := db.db.Exec(
+func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
+	_, err := db.db.ExecContext(
+		ctx,
 		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
 			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, last=?`,
 		r.Name,
@@ -90,13 +92,13 @@ func (db *DB) Update(r Stats) (Stats, error) {
 	return r, err
 }
 
-func (db *DB) Bump(name string) (Stats, error) {
-	r, err := db.Get(name)
+func (db *DB) Bump(ctx context.Context, name string) (Stats, error) {
+	r, err := db.Get(ctx, name)
 	if err != nil {
 		return Stats{}, fmt.Errorf("error retrieving record: %w", err)
 	}
 
-	r, err = db.Update(bumpStats(r, time.Now()))
+	r, err = db.Update(ctx, bumpStats(r, time.Now()))
 	if err != nil {
 		return Stats{}, fmt.Errorf("error updating record: %w", err)
 	}
@@ -132,8 +134,9 @@ func bumpStats(r Stats, ts time.Time) Stats {
 	return r
 }
 
-func (db *DB) Get(name string) (Stats, error) {
-	row := db.db.QueryRow(
+func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
+	row := db.db.QueryRowContext(
+		ctx,
 		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
 	)

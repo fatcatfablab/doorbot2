@@ -50,7 +50,7 @@ func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if _, err := accessDb.Bump(msg.Data.Actor.Name); err != nil {
+	if _, err := accessDb.Bump(req.Context(), msg.Data.Actor.Name); err != nil {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -68,7 +68,7 @@ func handleUpdateRequest(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if _, err := accessDb.Update(r); err != nil {
+	if _, err := accessDb.Update(req.Context(), r); err != nil {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return

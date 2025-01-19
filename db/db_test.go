@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"log"
 	"path"
 	"testing"
@@ -62,6 +63,7 @@ func TestBumpStats(t *testing.T) {
 }
 
 func TestUpdateAndGet(t *testing.T) {
+	ctx := context.Background()
 	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +80,7 @@ func TestUpdateAndGet(t *testing.T) {
 		{Name: "Y", Total: 6, Streak: 1, Last: ttime},
 		{Name: "Z", Total: 1, Streak: 1, Last: ttime},
 	} {
-		_, err := db.Update(s)
+		_, err := db.Update(ctx, s)
 		if err != nil {
 			t.Fatalf("error updating db: %s", err)
 		}
@@ -98,7 +100,7 @@ func TestUpdateAndGet(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := db.Get(tt.want.Name)
+			got, err := db.Get(ctx, tt.want.Name)
 			if err != nil {
 				t.Fatalf("error getting stats: %s", err)
 			}
