@@ -3,10 +3,12 @@ package httphandlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,17 +16,15 @@ import (
 )
 
 const (
-	tz       = "America/New_York"
-	doordUrl = "/doord"
-	username = "xx"
+	udmUrl = "/udm"
 )
 
-func doordReqBuilder(payload string) func(*testing.T) *http.Request {
+func udmReqBuilder(payload string) func(*testing.T) *http.Request {
 	return func(t *testing.T) *http.Request {
 		var buffer bytes.Buffer
 		b := &buffer
 		b.WriteString(payload)
-		req, err := http.NewRequest(http.MethodPost, doordUrl, b)
+		req, err := http.NewRequest(http.MethodPost, udmUrl, b)
 		if err != nil {
 			t.Fatalf("error creating request: %s", err)
 		}
@@ -32,13 +32,22 @@ func doordReqBuilder(payload string) func(*testing.T) *http.Request {
 	}
 }
 
-func TestDoordRequest(t *testing.T) {
-	accessDb, err := db.New(path.Join(t.TempDir(), "test-doord-request.sqlite"), tz)
+func udmReqBuilderFromMsg(msg udmMsg) func(*testing.T) *http.Request {
+	var sb strings.Builder
+	j := json.NewEncoder(&sb)
+	j.Encode(msg)
+	return udmReqBuilder(sb.String())
+}
+
+func TestUdmRequest(t *testing.T) {
+	accessDb, err := db.New(path.Join(t.TempDir(), "test-udm-request.sqlite"), tz)
 	if err != nil {
 		t.Fatalf("error creating db: %s", err)
 	}
 
 	mux := NewMux(accessDb)
+	origTs := time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc())
+	origNext := origTs.Add(24 * time.Hour)
 
 	for _, tt := range []struct {
 		name       string
@@ -48,30 +57,42 @@ func TestDoordRequest(t *testing.T) {
 	}{
 		{
 			name:       "Invalid json",
-			reqBuilder: doordReqBuilder("invalid json"),
+			reqBuilder: udmReqBuilder("invalid json"),
 			wantCode:   http.StatusBadRequest,
 			wantStats:  db.Stats{},
 		},
 		{
-			name:       "Valid request",
-			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-20T00:20:09.760614","name":"xx","access_granted":true}`),
-			wantCode:   http.StatusOK,
+			name: "Valid request",
+			reqBuilder: udmReqBuilderFromMsg(udmMsg{
+				Data: udmMsgData{
+					Actor:  &udmActor{Name: username},
+					Object: &udmObject{Result: granted},
+				},
+				TimeForTesting: &origTs,
+			}),
+			wantCode: http.StatusOK,
 			wantStats: db.Stats{
 				Name:   username,
 				Total:  1,
 				Streak: 1,
-				Last:   time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc()),
+				Last:   origTs,
 			},
 		},
 		{
-			name:       "Continue streak",
-			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-21T00:20:09.760614","name":"xx","access_granted":true}`),
-			wantCode:   http.StatusOK,
+			name: "Continue streak",
+			reqBuilder: udmReqBuilderFromMsg(udmMsg{
+				Data: udmMsgData{
+					Actor:  &udmActor{Name: username},
+					Object: &udmObject{Result: granted},
+				},
+				TimeForTesting: &origNext,
+			}),
+			wantCode: http.StatusOK,
 			wantStats: db.Stats{
 				Name:   username,
 				Total:  2,
 				Streak: 2,
-				Last:   time.Date(2025, 1, 21, 0, 20, 9, 0, accessDb.Loc()),
+				Last:   origNext,
 			},
 		},
 	} {

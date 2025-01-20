@@ -1,11 +1,11 @@
 package httphandlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
@@ -16,9 +16,10 @@ const (
 )
 
 type udmMsg struct {
-	Event         string     `json:"event"`
-	EventObjectId string     `json:"event_object_id"`
-	Data          udmMsgData `json:"data"`
+	Event          string     `json:"event"`
+	EventObjectId  string     `json:"event_object_id"`
+	Data           udmMsgData `json:"data"`
+	TimeForTesting *time.Time `json:"time_for_testing,omitempty"`
 }
 
 type udmMsgData struct {
@@ -44,9 +45,14 @@ type udmObject struct {
 }
 
 func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
-	sb := &strings.Builder{}
-	j := json.NewDecoder(io.TeeReader(req.Body, sb))
-	log.Print("Udm request received: " + sb.String())
+	var buffer bytes.Buffer
+	_, err := io.Copy(&buffer, req.Body)
+	if err != nil {
+		log.Printf("error copying body to buffer")
+	}
+	log.Printf("UDM request received: %s", buffer.String())
+
+	j := json.NewDecoder(&buffer)
 	msg := udmMsg{}
 	if err := j.Decode(&msg); err != nil {
 		log.Printf("error parsing message: %s", err)
@@ -54,8 +60,15 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	var ts time.Time
+	if msg.TimeForTesting != nil {
+		ts = *msg.TimeForTesting
+	} else {
+		ts = time.Now()
+	}
+
 	r := db.AccessRecord{
-		Timestamp:     time.Now(),
+		Timestamp:     ts,
 		Name:          msg.Data.Actor.Name,
 		AccessGranted: msg.Data.Object.Result == granted,
 	}
