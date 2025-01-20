@@ -10,6 +10,7 @@ import (
 
 const (
 	username = "Johnny Melavo"
+	tz       = "America/New_York"
 )
 
 func TestBumpStats(t *testing.T) {
@@ -64,18 +65,13 @@ func TestBumpStats(t *testing.T) {
 
 func TestUpdateAndGet(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"))
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"), tz)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		t.Fatalf("error loading timezone: %s", err)
-	}
-
-	ttime := time.Date(2025, 1, 17, 13, 0, 0, 0, loc)
+	ttime := time.Date(2025, 1, 17, 13, 0, 0, 0, db.loc)
 	for _, s := range []Stats{
 		{Name: "X", Total: 9, Streak: 8, Last: ttime},
 		{Name: "Y", Total: 6, Streak: 1, Last: ttime},
@@ -117,18 +113,13 @@ func TestUpdateAndGet(t *testing.T) {
 
 func TestBump(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-bump.sqlite"))
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-bump.sqlite"), tz)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		t.Fatalf("error loading timezone: %s", err)
-	}
-
-	ttime := time.Now().In(loc).Add(-24 * time.Hour)
+	ttime := time.Now().In(db.loc).Add(-24 * time.Hour)
 	r := Stats{Name: username, Total: 9, Streak: 8, Last: ttime}
 
 	_, err = db.Update(ctx, r)
@@ -148,7 +139,7 @@ func TestBump(t *testing.T) {
 		t.Error("stats differ")
 	}
 
-	if newDate(got.Last.In(loc).Date()) != newDate(want.Last.In(loc).Date()) {
+	if newDate(got.Last.In(db.loc).Date()) != newDate(want.Last.In(db.loc).Date()) {
 		log.Printf("want: %+v", want)
 		log.Printf("got:  %+v", got)
 		t.Error("timestamps differ")
@@ -157,17 +148,13 @@ func TestBump(t *testing.T) {
 
 func TestAddRecord(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-addEntry.sqlite"))
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-addEntry.sqlite"), tz)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		t.Fatalf("error loading timezone: %s", err)
-	}
-
+	loc := db.loc
 	for _, tt := range []struct {
 		name   string
 		record AccessRecord

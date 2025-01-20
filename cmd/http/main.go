@@ -11,6 +11,10 @@ import (
 	"github.com/fatcatfablab/doorbot2/db"
 )
 
+const (
+	tz = "America/New_York"
+)
+
 var (
 	addr     = flag.String("addr", ":8443", "Address to listen on")
 	secure   = flag.Bool("secure", true, "Whether to use TLS")
@@ -80,7 +84,7 @@ func main() {
 	flag.Parse()
 
 	var err error
-	accessDb, err = db.New(*dbPath)
+	accessDb, err = db.New(*dbPath, tz)
 	if err != nil {
 		log.Fatalf("error opening database: %s", err)
 	}

@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	tz       = "America/New_York"
 	driver   = "sqlite3"
 	initStmt = `
 CREATE TABLE IF NOT EXISTS stats (
@@ -60,14 +59,20 @@ type date struct {
 }
 
 type DB struct {
-	db *sql.DB
+	db  *sql.DB
+	loc *time.Location
 }
 
 func newDate(year int, month time.Month, day int) date {
 	return date{year: year, month: month, day: day}
 }
 
-func New(path string) (*DB, error) {
+func New(path, tz string) (*DB, error) {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil, fmt.Errorf("error loading tz %q: %w", tz, err)
+	}
+
 	db, err := sql.Open(driver, path)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
@@ -85,7 +90,7 @@ func New(path string) (*DB, error) {
 		return nil, fmt.Errorf("couldn't enable WAL mode: %w", err)
 	}
 
-	return &DB{db: db}, nil
+	return &DB{db: db, loc: loc}, nil
 }
 
 func initializeDb(db *sql.DB) error {
