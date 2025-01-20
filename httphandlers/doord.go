@@ -1,14 +1,18 @@
 package httphandlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
+)
+
+const (
+	layout = "2006-01-02T15:04:05"
 )
 
 type doordMsg struct {
@@ -18,17 +22,22 @@ type doordMsg struct {
 }
 
 func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
-	sb := &strings.Builder{}
-	j := json.NewDecoder(io.TeeReader(req.Body, sb))
-	log.Print("Doord request received: " + sb.String())
+	var buffer bytes.Buffer
+	_, err := io.Copy(&buffer, req.Body)
+	if err != nil {
+		log.Printf("error copying body to buffer")
+	}
+	log.Printf("Doord request received: %s", buffer.String())
+
+	j := json.NewDecoder(&buffer)
 	msg := doordMsg{}
 	if err := j.Decode(&msg); err != nil {
-		log.Printf("error decoding override request: %s", err)
+		log.Printf("error decoding doord request: %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	t, err := time.ParseInLocation(time.RFC3339, msg.Timestamp, h.db.Loc())
+	t, err := time.ParseInLocation(layout, msg.Timestamp, h.db.Loc())
 	if err != nil {
 		log.Printf("couldn't parse timestamp %q: %s", msg.Timestamp, err)
 		w.WriteHeader(http.StatusBadRequest)
