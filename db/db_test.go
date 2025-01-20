@@ -68,6 +68,7 @@ func TestUpdateAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
@@ -111,5 +112,45 @@ func TestUpdateAndGet(t *testing.T) {
 				t.Fatal("stats differ")
 			}
 		})
+	}
+}
+
+func TestBump(t *testing.T) {
+	ctx := context.Background()
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		t.Fatalf("error loading timezone: %s", err)
+	}
+
+	ttime := time.Now().In(loc).Add(-24 * time.Hour)
+	r := Stats{Name: username, Total: 9, Streak: 8, Last: ttime}
+
+	_, err = db.Update(ctx, r)
+	if err != nil {
+		t.Fatalf("error running update: %s", err)
+	}
+
+	want := Stats{Name: username, Total: 10, Streak: 9, Last: time.Now().In(ttime.Location())}
+	got, err := db.Bump(ctx, username)
+	if err != nil {
+		t.Fatalf("unexpected error calling bump: %s", err)
+	}
+
+	if got.Name != want.Name || got.Total != want.Total || got.Streak != want.Streak {
+		log.Printf("want: %+v", want)
+		log.Printf("got:  %+v", got)
+		t.Error("stats differ")
+	}
+
+	if newDate(got.Last.Date()) != newDate(want.Last.Date()) {
+		log.Printf("want: %+v", want)
+		log.Printf("got:  %+v", got)
+		t.Error("timestamps differ")
 	}
 }
