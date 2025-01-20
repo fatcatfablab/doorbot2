@@ -7,12 +7,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
 )
 
 const (
-	tz = "America/New_York"
+	tz      = "America/New_York"
+	granted = "Access Granted"
 )
 
 var (
@@ -24,6 +26,12 @@ var (
 	accessDb *db.DB
 )
 
+type DoordMsg struct {
+	Timestamp     string `json:"timestamp"`
+	Name          string `json:"name"`
+	AccessGranted bool   `json:"access_granted"`
+}
+
 type UdmMsg struct {
 	Event         string     `json:"event"`
 	EventObjectId string     `json:"event_object_id"`
@@ -34,13 +42,22 @@ type UdmMsgData struct {
 	Location map[string]any `json:"location"`
 	Device   map[string]any `json:"device"`
 	Actor    *UdmActor      `json:"actor"`
-	Object   map[string]any `json:"object"`
+	Object   *UdmObject     `json:"object"`
 }
 
 type UdmActor struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+}
+
+type UdmObject struct {
+	AuthenticationType  string `json:"authentication_call"`
+	AuthenticationValue string `json:"authentication_value"`
+	PolicyId            string `json:"policy_id"`
+	PolicyName          string `json:"policy_name"`
+	ReaderId            string `json:"reader_id"`
+	Result              string `json:"result"`
 }
 
 func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
@@ -50,11 +67,16 @@ func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
 	msg := UdmMsg{}
 	if err := j.Decode(&msg); err != nil {
 		log.Printf("error parsing message: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if _, err := accessDb.Bump(req.Context(), msg.Data.Actor.Name); err != nil {
+	r := db.AccessRecord{
+		Timestamp:     time.Now(),
+		Name:          msg.Data.Actor.Name,
+		AccessGranted: msg.Data.Object.Result == granted,
+	}
+	if _, err := accessDb.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -62,17 +84,30 @@ func handleUdmRequest(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleUpdateRequest(w http.ResponseWriter, req *http.Request) {
+func handleDoordRequest(w http.ResponseWriter, req *http.Request) {
 	sb := &strings.Builder{}
 	j := json.NewDecoder(io.TeeReader(req.Body, sb))
-	log.Print("Update received: " + sb.String())
-	r := db.Stats{}
-	if err := j.Decode(&r); err != nil {
+	log.Print("Doord request received: " + sb.String())
+	msg := DoordMsg{}
+	if err := j.Decode(&msg); err != nil {
 		log.Printf("error decoding override request: %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if _, err := accessDb.Update(req.Context(), r); err != nil {
+
+	t, err := time.ParseInLocation(time.RFC3339, msg.Timestamp, accessDb.Loc())
+	if err != nil {
+		log.Printf("couldn't parse timestamp %q: %s", msg.Timestamp, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	r := db.AccessRecord{
+		Timestamp:     t,
+		Name:          msg.Name,
+		AccessGranted: msg.AccessGranted,
+	}
+	if _, err := accessDb.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -91,8 +126,8 @@ func main() {
 	defer accessDb.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /{$}", handleUdmRequest)
-	mux.HandleFunc("POST /update{$}", handleUpdateRequest)
+	mux.HandleFunc("POST /udm{$}", handleUdmRequest)
+	mux.HandleFunc("POST /doord{$}", handleDoordRequest)
 
 	s := &http.Server{
 		Addr:    *addr,

@@ -118,10 +118,6 @@ func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
 	return r, err
 }
 
-func (db *DB) Bump(ctx context.Context, name string) (Stats, error) {
-	return db.bumpWithTimestamp(ctx, name, time.Now())
-}
-
 func (db *DB) bumpWithTimestamp(ctx context.Context, name string, ts time.Time) (Stats, error) {
 	r, err := db.Get(ctx, name)
 	if err != nil {
@@ -186,10 +182,10 @@ func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
 	return r, nil
 }
 
-func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (err error) {
+func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (s Stats, err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
-		return fmt.Errorf("error starting tx: %w", err)
+		return Stats{}, fmt.Errorf("error starting tx: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -211,12 +207,12 @@ func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (err error) {
 		r.AccessGranted,
 	)
 
-	_, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+	s, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("error commiting tx: %w", err)
 	}
-	return err
+	return s, err
 }
 
 func (db *DB) getDbh(ctx context.Context) dbh {
@@ -225,4 +221,8 @@ func (db *DB) getDbh(ctx context.Context) dbh {
 		return db.db
 	}
 	return tx.(dbh)
+}
+
+func (db *DB) Loc() *time.Location {
+	return db.loc
 }

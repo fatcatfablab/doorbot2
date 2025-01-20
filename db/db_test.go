@@ -111,41 +111,6 @@ func TestUpdateAndGet(t *testing.T) {
 	}
 }
 
-func TestBump(t *testing.T) {
-	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-bump.sqlite"), tz)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	ttime := time.Now().In(db.loc).Add(-24 * time.Hour)
-	r := Stats{Name: username, Total: 9, Streak: 8, Last: ttime}
-
-	_, err = db.Update(ctx, r)
-	if err != nil {
-		t.Fatalf("error running update: %s", err)
-	}
-
-	want := Stats{Name: username, Total: 10, Streak: 9, Last: time.Now().In(ttime.Location())}
-	got, err := db.Bump(ctx, username)
-	if err != nil {
-		t.Fatalf("unexpected error calling bump: %s", err)
-	}
-
-	if got.Name != want.Name || got.Total != want.Total || got.Streak != want.Streak {
-		log.Printf("want: %+v", want)
-		log.Printf("got:  %+v", got)
-		t.Error("stats differ")
-	}
-
-	if newDate(got.Last.In(db.loc).Date()) != newDate(want.Last.In(db.loc).Date()) {
-		log.Printf("want: %+v", want)
-		log.Printf("got:  %+v", got)
-		t.Error("timestamps differ")
-	}
-}
-
 func TestAddRecord(t *testing.T) {
 	ctx := context.Background()
 	db, err := New(path.Join(t.TempDir(), "doorbot2-test-addEntry.sqlite"), tz)
@@ -197,14 +162,9 @@ func TestAddRecord(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := db.AddRecord(ctx, tt.record)
+			got, err := db.AddRecord(ctx, tt.record)
 			if err != nil {
 				t.Fatalf("error adding record: %s", err)
-			}
-
-			got, err := db.Get(ctx, tt.record.Name)
-			if err != nil {
-				t.Fatalf("error getting stats: %s", err)
 			}
 
 			got.Last = got.Last.In(tt.want.Last.Location())
