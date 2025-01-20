@@ -117,7 +117,7 @@ func TestUpdateAndGet(t *testing.T) {
 
 func TestBump(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"))
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-bump.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,9 +148,84 @@ func TestBump(t *testing.T) {
 		t.Error("stats differ")
 	}
 
-	if newDate(got.Last.Date()) != newDate(want.Last.Date()) {
+	if newDate(got.Last.In(loc).Date()) != newDate(want.Last.In(loc).Date()) {
 		log.Printf("want: %+v", want)
 		log.Printf("got:  %+v", got)
 		t.Error("timestamps differ")
+	}
+}
+
+func TestAddRecord(t *testing.T) {
+	ctx := context.Background()
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-addEntry.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		t.Fatalf("error loading timezone: %s", err)
+	}
+
+	for _, tt := range []struct {
+		name   string
+		record AccessRecord
+		want   Stats
+	}{
+		{
+			name:   "Add record 1",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 1, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 1, Streak: 1, Last: time.Date(2020, 1, 1, 12, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Next day",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 2, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 2, Streak: 2, Last: time.Date(2020, 1, 2, 12, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Continue streak",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 3, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 3, Streak: 3, Last: time.Date(2020, 1, 3, 12, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Break streak",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 12, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Same day",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 13, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 13, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Same day later",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 14, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 14, 0, 0, 0, loc)},
+		},
+		{
+			name:   "Continue streak again",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 8, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			want:   Stats{Name: username, Total: 5, Streak: 2, Last: time.Date(2020, 1, 8, 12, 0, 0, 0, loc)},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := db.AddRecord(ctx, tt.record)
+			if err != nil {
+				t.Fatalf("error adding record: %s", err)
+			}
+
+			got, err := db.Get(ctx, tt.record.Name)
+			if err != nil {
+				t.Fatalf("error getting stats: %s", err)
+			}
+
+			got.Last = got.Last.In(tt.want.Last.Location())
+			if tt.want != got {
+				log.Printf("want: %+v", tt.want)
+				log.Printf("got : %+v", got)
+				t.Error("stats differ")
+			}
+		})
 	}
 }

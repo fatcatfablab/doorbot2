@@ -22,14 +22,35 @@ CREATE TABLE IF NOT EXISTS stats (
 	   streak INTEGER NOT NULL,
 	   last INTEGER NOT NULL,
        PRIMARY KEY (name)
+) STRICT;
+CREATE TABLE IF NOT EXISTS history (
+               timestamp INTEGER NOT NULL,
+               name TEXT NOT NULL,
+               access_granted INTEGER NOT NULL,
+               PRIMARY KEY (timestamp, name)
 ) STRICT;`
 )
+
+// This is the common interface between a *sql.DB and a *sql.Tx used here,
+// so methods can seamlessly work with either
+type dbh interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+type dbKey struct{}
 
 type Stats struct {
 	Name   string    `json:"name"`
 	Total  uint      `json:"total"`
 	Streak uint      `json:"streak"`
 	Last   time.Time `json:"last"`
+}
+
+type AccessRecord struct {
+	Timestamp     time.Time `json:"timestamp"`
+	Name          string    `json:"name"`
+	AccessGranted bool      `json:"access_granted"`
 }
 
 type date struct {
@@ -77,7 +98,7 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
-	_, err := db.db.ExecContext(
+	_, err := db.getDbh(ctx).ExecContext(
 		ctx,
 		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
 			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, last=?`,
@@ -93,12 +114,16 @@ func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
 }
 
 func (db *DB) Bump(ctx context.Context, name string) (Stats, error) {
+	return db.bumpWithTimestamp(ctx, name, time.Now())
+}
+
+func (db *DB) bumpWithTimestamp(ctx context.Context, name string, ts time.Time) (Stats, error) {
 	r, err := db.Get(ctx, name)
 	if err != nil {
 		return Stats{}, fmt.Errorf("error retrieving record: %w", err)
 	}
 
-	r, err = db.Update(ctx, bumpStats(r, time.Now()))
+	r, err = db.Update(ctx, bumpStats(r, ts))
 	if err != nil {
 		return Stats{}, fmt.Errorf("error updating record: %w", err)
 	}
@@ -135,7 +160,7 @@ func bumpStats(r Stats, ts time.Time) Stats {
 }
 
 func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
-	row := db.db.QueryRowContext(
+	row := db.getDbh(ctx).QueryRowContext(
 		ctx,
 		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
@@ -154,4 +179,45 @@ func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
 	}
 
 	return r, nil
+}
+
+func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return fmt.Errorf("error starting tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			rerr := tx.Rollback()
+			if rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+		}
+	}()
+
+	ctx = context.WithValue(ctx, dbKey{}, tx)
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO history(timestamp, name, access_granted) VALUES (?, ?, ?)`+
+			`ON CONFLICT(timestamp, name) DO UPDATE SET access_granted=?`,
+		r.Timestamp.Unix(),
+		r.Name,
+		r.AccessGranted,
+		r.AccessGranted,
+	)
+
+	_, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("error commiting tx: %w", err)
+	}
+	return err
+}
+
+func (db *DB) getDbh(ctx context.Context) dbh {
+	tx := ctx.Value(dbKey{})
+	if tx == nil {
+		return db.db
+	}
+	return tx.(dbh)
 }
