@@ -160,6 +160,11 @@ func TestAddRecord(t *testing.T) {
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 8, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
 			want:   Stats{Name: username, Total: 5, Streak: 2, Last: time.Date(2020, 1, 8, 12, 0, 0, 0, loc)},
 		},
+		{
+			name:   "Access not granted doesn't bump stats",
+			record: AccessRecord{Timestamp: time.Date(2020, 1, 9, 12, 0, 0, 0, loc), Name: username, AccessGranted: false},
+			want:   Stats{Name: username, Total: 5, Streak: 2, Last: time.Date(2020, 1, 8, 12, 0, 0, 0, loc)},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := db.AddRecord(ctx, tt.record)

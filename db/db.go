@@ -207,7 +207,12 @@ func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (s Stats, err error
 		r.AccessGranted,
 	)
 
-	s, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+	if r.AccessGranted {
+		s, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+	} else {
+		s, err = db.Get(ctx, r.Name)
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("error commiting tx: %w", err)
