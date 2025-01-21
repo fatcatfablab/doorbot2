@@ -4,9 +4,11 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/fatcatfablab/doorbot2/db"
 	"github.com/fatcatfablab/doorbot2/httphandlers"
+	"github.com/fatcatfablab/doorbot2/sender"
 )
 
 const (
@@ -14,11 +16,13 @@ const (
 )
 
 var (
-	addr   = flag.String("addr", ":8443", "Address to listen on")
-	secure = flag.Bool("secure", true, "Whether to use TLS")
-	cert   = flag.String("cert", "certs/cert.pem", "Path to the certificate")
-	key    = flag.String("key", "certs/key.pem", "Path to the private key")
-	dbPath = flag.String("dbPath", "access.sqlite", "Path to the sqlite3 database")
+	addr         = flag.String("addr", ":8443", "Address to listen on")
+	secure       = flag.Bool("secure", true, "Whether to use TLS")
+	cert         = flag.String("cert", "certs/cert.pem", "Path to the certificate")
+	key          = flag.String("key", "certs/key.pem", "Path to the private key")
+	dbPath       = flag.String("dbPath", "access.sqlite", "Path to the sqlite3 database")
+	slackToken   = flag.String("slackToken", os.Getenv("DOORBOT2_SLACK_TOKEN"), "Slack token")
+	slackChannel = flag.String("slackChannel", os.Getenv("DOORBOT2_SLACK_CHANNEL"), "Slack channel")
 )
 
 func main() {
@@ -31,9 +35,10 @@ func main() {
 	}
 	defer accessDb.Close()
 
+	slackClient := sender.NewSlack(*slackChannel, *slackToken)
 	s := &http.Server{
 		Addr:    *addr,
-		Handler: httphandlers.NewMux(accessDb),
+		Handler: httphandlers.NewMux(accessDb, slackClient),
 	}
 
 	log.Printf("Server listening on %q", *addr)

@@ -1,16 +1,22 @@
 package httphandlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/fatcatfablab/doorbot2/db"
 )
 
-type handlers struct {
-	db *db.DB
+type sender interface {
+	Post(ctx context.Context, s db.Stats) error
 }
 
-func NewMux(accessDb *db.DB) *http.ServeMux {
+type handlers struct {
+	db *db.DB
+	s  sender
+}
+
+func NewMux(accessDb *db.DB, s sender) *http.ServeMux {
 	h := handlers{db: accessDb}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /doord", h.doordRequest)
