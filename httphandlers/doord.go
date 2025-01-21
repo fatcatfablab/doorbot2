@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// This format matches python's datetime.isoformat, so it's easy to
+	// generate client side.
 	layout = "2006-01-02T15:04:05"
 )
 
