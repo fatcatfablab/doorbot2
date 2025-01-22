@@ -51,10 +51,17 @@ func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
 		Name:          msg.Name,
 		AccessGranted: msg.AccessGranted,
 	}
-	if _, err := h.db.AddRecord(req.Context(), r); err != nil {
+	if s, err := h.db.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	} else {
+		if r.AccessGranted && h.s != nil {
+			err = h.s.Post(req.Context(), s)
+			if err != nil {
+				log.Printf("error posting message: %s", err)
+			}
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }

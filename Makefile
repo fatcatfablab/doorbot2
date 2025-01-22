@@ -95,7 +95,7 @@ DOCKER_BUILD_CONTEXT ?= .
 
 # Test Configuration
 TEST_TIMEOUT ?= 5m
-TEST_FLAGS ?= -v -race -cover
+TEST_FLAGS ?= -race -cover
 COVERAGE_OUT ?= coverage.out
 COVERAGE_HTML ?= coverage.html
 COVERAGE_THRESHOLD ?= 80

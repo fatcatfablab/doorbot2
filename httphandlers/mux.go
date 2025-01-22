@@ -17,7 +17,7 @@ type handlers struct {
 }
 
 func NewMux(accessDb *db.DB, s sender) *http.ServeMux {
-	h := handlers{db: accessDb}
+	h := handlers{db: accessDb, s: s}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /doord", h.doordRequest)
 	mux.HandleFunc("POST /udm", h.udmRequest)
