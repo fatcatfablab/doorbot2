@@ -23,28 +23,17 @@ jobs:
         with:
           go-version: "1.23"
 
-      - name: install arm toolchain
+      - name: Test
+        run: make test
+
+      - name: Build
         run: |
           sudo apt update
           sudo apt install gcc-10-arm-linux-gnueabihf
-
-      - name: Build
-        env:
-          CC: arm-linux-gnueabihf-gcc-10
-          CGO_ENABLED: 1
-          GOOS: linux
-          GOARCH: arm
-        run: |
-          mkdir dist
-          for v in http ws; do
-            go build -o dist/doorbot2-$v ./cmd/$v
-          done
-
-      - name: Test
-        run: go test -v -cover ./...
+          make build-all
 
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: dist/doorbot2-*
+          files: dist/*.tar.gz
