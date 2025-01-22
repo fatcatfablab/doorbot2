@@ -37,18 +37,20 @@ func (d *DoordSender) Post(ctx context.Context, stats db.Stats) error {
 		1,
 	)
 	req := &http.Request{
-		Method: http.MethodPost,
-		URL:    d.url,
-		Body:   io.NopCloser(&b),
+		Method:        http.MethodPost,
+		URL:           d.url,
+		Body:          io.NopCloser(&b),
+		ContentLength: int64(b.Len()),
 	}
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("error sending doord request: %w", err)
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("doord request returned: %s", resp.Status)
 	}
-	defer resp.Body.Close()
 
 	return nil
 }

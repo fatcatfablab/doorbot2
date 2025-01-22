@@ -34,8 +34,13 @@ func TestPost(t *testing.T) {
 			name:  "UTC",
 			stats: db.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 0, 0, 0, time.UTC)},
 			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				want := "01/21/2025,12:00:00,Johnny Melavo,1"
+
 				if r.Method != http.MethodPost {
 					t.Errorf("unexpected method")
+				}
+				if r.ContentLength != int64(len(want)) {
+					t.Errorf("content-length mismatch. %d %d", r.ContentLength, len(want))
 				}
 				var got strings.Builder
 				_, err := io.Copy(&got, r.Body)
@@ -43,7 +48,6 @@ func TestPost(t *testing.T) {
 					t.Fatalf("error copying req body: %s", err)
 				}
 
-				want := "01/21/2025,12:00:00,Johnny Melavo,1"
 				if got.String() != want {
 					log.Printf("want: %+v", want)
 					log.Printf("got : %+v", got.String())
