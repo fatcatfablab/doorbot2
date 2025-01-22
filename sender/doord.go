@@ -23,11 +23,7 @@ type DoordSender struct {
 }
 
 func NewDoord(url *url.URL) *DoordSender {
-	return newWithHttpClient(url, &http.Client{})
-}
-
-func newWithHttpClient(url *url.URL, c *http.Client) *DoordSender {
-	return &DoordSender{url: url, client: c}
+	return &DoordSender{url: url, client: &http.Client{Timeout: 2 * time.Second}}
 }
 
 func (d *DoordSender) Post(ctx context.Context, stats db.Stats) error {
