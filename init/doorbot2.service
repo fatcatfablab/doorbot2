@@ -1,0 +1,13 @@
+[Unit]
+Description = Doorbot 2
+After = network.target
+
+[Service]
+Type = simple
+WorkingDirectory = /opt/doorbot2
+EnvironmentFile = /opt/doorbot2/.env
+ExecStart = /opt/doorbot2/doorbot2 --secure=false --addr :8080
+Restart = always
+
+[Install]
+WantedBy = multi-user.target
