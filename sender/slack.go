@@ -21,12 +21,12 @@ const (
 var (
 	totalsConf = map[uint]badge{
 		0:   {badge: ":fatcat:", msg: ""},
-		5:   {badge: ":fatcat-yellow:", msg: "UNO"},
-		29:  {badge: ":fatcat-green:", msg: "TEENSY"},
-		98:  {badge: ":fatcat-blue:", msg: "RPI"},
-		363: {badge: ":fatcat-pink:", msg: "COMMUNITY"},
-		498: {badge: ":fatcat-red:", msg: "CORE"},
-		998: {badge: ":fatcat-black:", msg: "PILLAR"},
+		6:   {badge: ":fatcat-yellow:", msg: "UNO"},
+		30:  {badge: ":fatcat-green:", msg: "TEENSY"},
+		99:  {badge: ":fatcat-blue:", msg: "RPI"},
+		364: {badge: ":fatcat-pink:", msg: "COMMUNITY"},
+		499: {badge: ":fatcat-red:", msg: "CORE"},
+		999: {badge: ":fatcat-black:", msg: "PILLAR"},
 	}
 
 	streaksConf = map[uint]badge{

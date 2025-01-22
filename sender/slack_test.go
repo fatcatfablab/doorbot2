@@ -36,20 +36,20 @@ func TestStatsToString(t *testing.T) {
 		},
 		{
 			name:  "UNO medal",
-			stats: db.Stats{Name: name, Total: 6, Streak: 2},
+			stats: db.Stats{Name: name, Total: 7, Streak: 2},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d\n:tada: Achievement unlocked! You get the UNO medal: :fatcat-yellow:",
-				name, ":fatcat-yellow:", 6, ":cat2:", 2,
+				name, ":fatcat-yellow:", 7, ":cat2:", 2,
 			),
 		},
 		{
 			name:  "medal and streak achievements",
-			stats: db.Stats{Name: name, Total: 30, Streak: 14},
+			stats: db.Stats{Name: name, Total: 31, Streak: 14},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d"+
 					"\n:tada: Achievement unlocked! You get the TEENSY medal: :fatcat-green:"+
 					"\nLab cat to lab rat!",
-				name, ":fatcat-green:", 30, ":rat:", 14,
+				name, ":fatcat-green:", 31, ":rat:", 14,
 			),
 		},
 	} {
