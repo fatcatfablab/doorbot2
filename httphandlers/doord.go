@@ -55,13 +55,12 @@ func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else {
-		if r.AccessGranted && h.s != nil {
-			err = h.s.Post(req.Context(), s)
-			if err != nil {
-				log.Printf("error posting message: %s", err)
-			}
+	} else if r.AccessGranted && h.slack != nil {
+		err = h.slack.Post(req.Context(), s)
+		if err != nil {
+			log.Printf("error posting message: %s", err)
 		}
 	}
+
 	w.WriteHeader(http.StatusOK)
 }

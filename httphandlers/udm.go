@@ -77,10 +77,16 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else {
-		if r.AccessGranted && h.s != nil {
-			err = h.s.Post(req.Context(), s)
+		if r.AccessGranted && h.slack != nil {
+			err = h.slack.Post(req.Context(), s)
 			if err != nil {
-				log.Printf("error posting message: %s", err)
+				log.Printf("error posting message to slack: %s", err)
+			}
+		}
+		if h.doord != nil {
+			err = h.doord.Post(req.Context(), s)
+			if err != nil {
+				log.Printf("error posting message to doord: %s", err)
 			}
 		}
 	}

@@ -38,7 +38,7 @@ func TestDoordRequest(t *testing.T) {
 		t.Fatalf("error creating db: %s", err)
 	}
 
-	mux := NewMux(accessDb, nil)
+	mux := NewMux(accessDb, nil, nil)
 
 	for _, tt := range []struct {
 		name       string

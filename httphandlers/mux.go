@@ -12,12 +12,13 @@ type sender interface {
 }
 
 type handlers struct {
-	db *db.DB
-	s  sender
+	db    *db.DB
+	slack sender
+	doord sender
 }
 
-func NewMux(accessDb *db.DB, s sender) *http.ServeMux {
-	h := handlers{db: accessDb, s: s}
+func NewMux(accessDb *db.DB, slack sender, doord sender) *http.ServeMux {
+	h := handlers{db: accessDb, slack: slack, doord: doord}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /doord", h.doordRequest)
 	mux.HandleFunc("POST /udm", h.udmRequest)

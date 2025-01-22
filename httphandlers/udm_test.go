@@ -45,7 +45,7 @@ func TestUdmRequest(t *testing.T) {
 		t.Fatalf("error creating db: %s", err)
 	}
 
-	mux := NewMux(accessDb, nil)
+	mux := NewMux(accessDb, nil, nil)
 	origTs := time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc())
 	origNext := origTs.Add(24 * time.Hour)
 

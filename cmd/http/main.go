@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/fatcatfablab/doorbot2/db"
@@ -23,6 +24,7 @@ var (
 	dbPath       = flag.String("dbPath", "access.sqlite", "Path to the sqlite3 database")
 	slackToken   = flag.String("slackToken", os.Getenv("DOORBOT2_SLACK_TOKEN"), "Slack token")
 	slackChannel = flag.String("slackChannel", os.Getenv("DOORBOT2_SLACK_CHANNEL"), "Slack channel")
+	doordUrl     = flag.String("doordUrl", os.Getenv("DOORBOT2_DOORD_URL"), "Doord integration url")
 )
 
 func main() {
@@ -35,10 +37,15 @@ func main() {
 	}
 	defer accessDb.Close()
 
-	slackClient := sender.NewSlack(*slackChannel, *slackToken)
+	dUrl, err := url.Parse(*doordUrl)
+	if err != nil {
+		log.Fatalf("failed to parse %s: %s", *doordUrl, err)
+	}
+	doordSender := sender.NewDoord(dUrl)
+	slackSender := sender.NewSlack(*slackChannel, *slackToken)
 	s := &http.Server{
 		Addr:    *addr,
-		Handler: httphandlers.NewMux(accessDb, slackClient),
+		Handler: httphandlers.NewMux(accessDb, slackSender, doordSender),
 	}
 
 	log.Printf("Server listening on %q", *addr)
