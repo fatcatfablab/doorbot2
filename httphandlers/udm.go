@@ -72,11 +72,11 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		Name:          msg.Data.Actor.Name,
 		AccessGranted: msg.Data.Object.Result == granted,
 	}
-	if s, err := h.db.AddRecord(req.Context(), r); err != nil {
+	if s, bumped, err := h.db.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else if r.AccessGranted {
+	} else if bumped {
 		if h.slack != nil {
 			err = h.slack.Post(req.Context(), s)
 			if err != nil {

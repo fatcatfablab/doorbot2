@@ -51,11 +51,11 @@ func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
 		Name:          msg.Name,
 		AccessGranted: msg.AccessGranted,
 	}
-	if s, err := h.db.AddRecord(req.Context(), r); err != nil {
+	if s, bumped, err := h.db.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else if r.AccessGranted && h.slack != nil {
+	} else if bumped && h.slack != nil {
 		err = h.slack.Post(req.Context(), s)
 		if err != nil {
 			log.Printf("error posting message: %s", err)

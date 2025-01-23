@@ -123,53 +123,66 @@ func TestAddRecord(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
 		record AccessRecord
+		bumped bool
 		want   Stats
 	}{
 		{
 			name:   "Add record 1",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 1, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: true,
 			want:   Stats{Name: username, Total: 1, Streak: 1, Last: time.Date(2020, 1, 1, 12, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Next day",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 2, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: true,
 			want:   Stats{Name: username, Total: 2, Streak: 2, Last: time.Date(2020, 1, 2, 12, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Continue streak",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 3, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: true,
 			want:   Stats{Name: username, Total: 3, Streak: 3, Last: time.Date(2020, 1, 3, 12, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Break streak",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: true,
 			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 12, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Same day",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 13, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: false,
 			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 13, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Same day later",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 7, 14, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: false,
 			want:   Stats{Name: username, Total: 4, Streak: 1, Last: time.Date(2020, 1, 7, 14, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Continue streak again",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 8, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+			bumped: true,
 			want:   Stats{Name: username, Total: 5, Streak: 2, Last: time.Date(2020, 1, 8, 12, 0, 0, 0, loc)},
 		},
 		{
 			name:   "Access not granted doesn't bump stats",
 			record: AccessRecord{Timestamp: time.Date(2020, 1, 9, 12, 0, 0, 0, loc), Name: username, AccessGranted: false},
+			bumped: false,
 			want:   Stats{Name: username, Total: 5, Streak: 2, Last: time.Date(2020, 1, 8, 12, 0, 0, 0, loc)},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := db.AddRecord(ctx, tt.record)
+			got, bumped, err := db.AddRecord(ctx, tt.record)
 			if err != nil {
 				t.Fatalf("error adding record: %s", err)
+			}
+
+			if bumped != tt.bumped {
+				t.Error("wrong bump detection")
 			}
 
 			got.Last = got.Last.In(tt.want.Last.Location())
