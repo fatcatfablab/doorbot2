@@ -76,8 +76,8 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else {
-		if r.AccessGranted && h.slack != nil {
+	} else if r.AccessGranted {
+		if h.slack != nil {
 			err = h.slack.Post(req.Context(), s)
 			if err != nil {
 				log.Printf("error posting message to slack: %s", err)
