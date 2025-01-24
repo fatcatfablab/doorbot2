@@ -45,6 +45,7 @@ func TestDoordRequest(t *testing.T) {
 		reqBuilder func(*testing.T) *http.Request
 		wantCode   int
 		wantStats  db.Stats
+		postSlack  bool
 	}{
 		{
 			name:       "Invalid json",
@@ -62,6 +63,7 @@ func TestDoordRequest(t *testing.T) {
 				Streak: 1,
 				Last:   time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc()),
 			},
+			postSlack: true,
 		},
 		{
 			name:       "Continue streak",
@@ -73,6 +75,14 @@ func TestDoordRequest(t *testing.T) {
 				Streak: 2,
 				Last:   time.Date(2025, 1, 21, 0, 20, 9, 0, accessDb.Loc()),
 			},
+			postSlack: true,
+		},
+		{
+			name:       "Access denied doesn't post",
+			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-21T00:20:09.760614","name":"xx","access_granted":false}`),
+			wantCode:   http.StatusNoContent,
+			wantStats:  db.Stats{},
+			postSlack:  false,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

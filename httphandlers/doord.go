@@ -51,11 +51,19 @@ func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
 		Name:          msg.Name,
 		AccessGranted: msg.AccessGranted,
 	}
+
+	if !r.AccessGranted {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if s, bumped, err := h.db.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error updating db: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else if bumped && h.slack != nil {
+		// TODO This is posting to slack temporarily just to verify it works.
+		// When in prod this should not post.
 		err = h.slack.Post(req.Context(), s)
 		if err != nil {
 			log.Printf("error posting message: %s", err)

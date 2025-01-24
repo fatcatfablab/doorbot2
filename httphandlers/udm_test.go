@@ -109,6 +109,20 @@ func TestUdmRequest(t *testing.T) {
 			postSlack: true,
 			postDoord: true,
 		},
+		{
+			name: "Access denied doesn't post",
+			reqBuilder: udmReqBuilderFromMsg(udmMsg{
+				Data: udmMsgData{
+					Actor:  &udmActor{},
+					Object: &udmObject{Result: "Access Denied"},
+				},
+				TimeForTesting: &origNext,
+			}),
+			wantCode:  http.StatusNoContent,
+			wantStats: db.Stats{},
+			postSlack: false,
+			postDoord: false,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			slackSender := MockSender{}

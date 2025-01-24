@@ -72,6 +72,12 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		Name:          msg.Data.Actor.Name,
 		AccessGranted: msg.Data.Object.Result == granted,
 	}
+
+	if !r.AccessGranted {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if s, bumped, err := h.db.AddRecord(req.Context(), r); err != nil {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
