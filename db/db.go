@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -35,6 +34,7 @@ CREATE TABLE IF NOT EXISTS history (
 type dbh interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
 type dbKey struct{}
@@ -138,16 +138,16 @@ func bumpStats(r Stats, ts time.Time) Stats {
 		r.Streak = 1
 	} else {
 		lastVisit := newDate(r.Last.Date())
-		log.Printf("lastVisit: %+v", lastVisit)
+		//log.Printf("lastVisit: %+v", lastVisit)
 		thisVisit := newDate(ts.Date())
-		log.Printf("thisVisit: %+v", thisVisit)
+		//log.Printf("thisVisit: %+v", thisVisit)
 		if thisVisit != lastVisit {
 			// This is a different day from the last visit, so bump the total
 			r.Total += 1
 		}
 
 		dayBefore := newDate(ts.Add(-24 * time.Hour).Date())
-		log.Printf("dayBefore: %+v", dayBefore)
+		//log.Printf("dayBefore: %+v", dayBefore)
 		if lastVisit == dayBefore {
 			// Last visit was the day before, so bump the streak
 			r.Streak += 1
@@ -232,4 +232,73 @@ func (db *DB) getDbh(ctx context.Context) dbh {
 
 func (db *DB) Loc() *time.Location {
 	return db.loc
+}
+
+func (db *DB) DumpHistory(ctx context.Context, name string) ([]AccessRecord, error) {
+	rows, err := db.getDbh(ctx).QueryContext(
+		ctx,
+		"SELECT timestamp, name, access_granted FROM history WHERE name=? ORDER BY timestamp ASC",
+		name,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error dumping history: %w", err)
+	}
+
+	result := make([]AccessRecord, 0)
+	for rows.Next() {
+		var r AccessRecord
+		var ts int64
+		err = rows.Scan(&ts, &r.Name, &r.AccessGranted)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning row: %w", err)
+		}
+
+		r.Timestamp = time.Unix(ts, 0)
+		result = append(result, r)
+	}
+
+	return result, nil
+}
+
+func (db *DB) Recompute(ctx context.Context, name string) (stats Stats, err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return Stats{}, fmt.Errorf("error starting tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			rerr := tx.Rollback()
+			if rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+		}
+	}()
+
+	ctx = context.WithValue(ctx, dbKey{}, tx)
+	_, err = tx.ExecContext(
+		ctx,
+		"DELETE FROM stats WHERE name = ?",
+		name,
+	)
+	if err != nil {
+		return Stats{}, fmt.Errorf("can't delete stats: %w", err)
+	}
+
+	records, err := db.DumpHistory(ctx, name)
+	for _, r := range records {
+		if !r.AccessGranted {
+			continue
+		}
+		stats, _, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+		if err != nil {
+			return Stats{}, err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return Stats{}, fmt.Errorf("error commiting: %w", err)
+	}
+
+	return stats, nil
 }

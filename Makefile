@@ -17,7 +17,7 @@ ENABLE_PROTO ?= false
 # Project Structure
 PROJECT_TYPE ?= basic # basic, monorepo, microservices
 MONOREPO_SERVICES ?= $(wildcard services/*)
-BUILD_TARGETS ?= http ws
+BUILD_TARGETS ?= http ws admin
 
 # Version Control
 VERSION_STRATEGY ?= git # git, semver, date
