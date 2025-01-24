@@ -1,15 +1,13 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"io"
+	"encoding/json"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -17,6 +15,32 @@ import (
 )
 
 const path = "/api/v1/developer/devices/notifications"
+const event = "access.logs.add"
+
+type wsMsg struct {
+	Event string `json:"event"`
+	Data  wsData `json:"data"`
+}
+
+type wsData struct {
+	Source wsSource `json:"_source"`
+}
+
+type wsSource struct {
+	Actor wsActor `json:"actor"`
+	Event wsEvent `json:"event"`
+}
+
+type wsActor struct {
+	Id          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	AlternateId string `json:"alternate_id"`
+}
+
+type wsEvent struct {
+	Type   string `json:"type"`
+	Result string `json:"result"`
+}
 
 var (
 	wsAddr string
@@ -61,24 +85,26 @@ func ws(cmd *cobra.Command, args []string) {
 	defer c.CloseNow()
 
 	for {
-		mType, r, err := c.Reader(context.Background())
+		_, r, err := c.Reader(context.Background())
 		if err != nil {
 			log.Printf("error reading from websocket: %s", err)
 			continue
 		}
 
-		buffer := &bytes.Buffer{}
-		if _, err := io.Copy(buffer, r); err != nil {
-			log.Printf("error copying msg to buffer: %s", err)
+		var msg wsMsg
+		j := json.NewDecoder(r)
+		if err := j.Decode(&msg); err != nil {
 			continue
 		}
 
-		msgStr := buffer.String()
-		if strings.HasPrefix(msgStr, "\"Hello\"") {
-			continue
-		}
-
-		log.Printf("MessageType: %s", mType)
-		log.Printf("Message: %s", msgStr)
+		processMsg(msg)
 	}
+}
+
+func processMsg(msg wsMsg) {
+	if msg.Event != event {
+		log.Printf("%s received. Ignoring", msg.Event)
+		return
+	}
+	log.Printf("%+v", msg)
 }
