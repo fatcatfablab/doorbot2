@@ -1,4 +1,4 @@
 .vscode/
 dist/
 bin/
-*.sqlite
+*.sqlite*

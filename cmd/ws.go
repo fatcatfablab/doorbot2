@@ -1,10 +1,9 @@
-package main
+package cmd
 
 import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"flag"
 	"io"
 	"log"
 	"net/http"
@@ -14,16 +13,28 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/spf13/cobra"
 )
 
 const path = "/api/v1/developer/devices/notifications"
 
-var addr = flag.String("addr", "localhost:8080", "http service address")
+var (
+	wsAddr string
 
-func main() {
-	flag.Parse()
+	wsCmd = &cobra.Command{
+		Use:   "ws",
+		Short: "Run the websocket subscriber",
+		Run:   ws,
+	}
+)
 
-	u := url.URL{Scheme: "wss", Host: *addr, Path: path}
+func init() {
+	wsCmd.PersistentFlags().StringVar(&wsAddr, "addr", "localhost:8080", "http service address")
+	rootCmd.AddCommand(wsCmd)
+}
+
+func ws(cmd *cobra.Command, args []string) {
+	u := url.URL{Scheme: "wss", Host: wsAddr, Path: path}
 	log.Printf("connecting to %s", u.String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,6 +81,4 @@ func main() {
 		log.Printf("MessageType: %s", mType)
 		log.Printf("Message: %s", msgStr)
 	}
-
-	// c.Close(websocket.StatusNormalClosure, "")
 }

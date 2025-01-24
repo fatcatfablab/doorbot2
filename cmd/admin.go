@@ -1,42 +1,46 @@
-package main
+package cmd
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/spf13/cobra"
 )
 
 var (
-	dbPath = flag.String("dbPath", "access.sqlite", "Path to the sqlite3 database")
-	name   = flag.String("name", "", "Name of the member to act on")
-	tz     = flag.String("tz", "America/New_York", "Time zone")
+	name string
+
+	adminCmd = &cobra.Command{
+		Use:   "admin",
+		Short: "Admin actions on a doorbot2 database",
+	}
+
+	dumpCmd = &cobra.Command{
+		Use: "dump",
+		Run: func(cmd *cobra.Command, args []string) {
+			dump(accessDb, name)
+		},
+	}
+
+	recomputeCmd = &cobra.Command{
+		Use: "recompute",
+		Run: func(cmd *cobra.Command, args []string) {
+			recompute(accessDb, name)
+		},
+	}
 )
 
-func main() {
-	flag.Parse()
+func init() {
+	adminCmd.PersistentFlags().StringVar(&name, "name", "", "Member name to act on")
+	adminCmd.MarkFlagRequired("name")
 
-	if *name == "" {
-		fmt.Println("--name required to be non empty")
-		return
-	}
+	adminCmd.AddCommand(dumpCmd)
+	adminCmd.AddCommand(recomputeCmd)
 
-	var err error
-	accessDb, err := db.New(*dbPath, *tz)
-	if err != nil {
-		log.Fatalf("error opening database: %s", err)
-	}
-	defer accessDb.Close()
-
-	switch flag.Arg(0) {
-	case "dump":
-		dump(accessDb, *name)
-	case "recompute":
-		recompute(accessDb, *name)
-	}
+	rootCmd.AddCommand(adminCmd)
 }
 
 func dump(accessDb *db.DB, name string) {

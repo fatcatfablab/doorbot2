@@ -17,7 +17,7 @@ ENABLE_PROTO ?= false
 # Project Structure
 PROJECT_TYPE ?= basic # basic, monorepo, microservices
 MONOREPO_SERVICES ?= $(wildcard services/*)
-BUILD_TARGETS ?= http ws admin
+BUILD_TARGETS ?= main.go
 
 # Version Control
 VERSION_STRATEGY ?= git # git, semver, date
@@ -181,7 +181,7 @@ build-target: generate
 			-gcflags '$(GCFLAGS)' \
 			-asmflags '$(ASMFLAGS)' \
 			-o $(BIN_DIR)/$(notdir $(TARGET)) \
-			./cmd/$(TARGET); \
+			./$(TARGET); \
 	fi
 
 .PHONY: install
@@ -313,8 +313,8 @@ build-all: $(DIST_DIR) ## Build for all platforms
 			CGO_ENABLED=$(CGO_ENABLED) $(if $(CC),CC=$(CC)) \
 			$(GO) build -tags '$(ALL_TAGS)' \
 				-ldflags '$(LD_FLAGS)' \
-				-o $(DIST_DIR)/$(PROJECT_NAME)-$(target)-$(OS)-$(ARCH)$(if $(ARM),v$(ARM))$(if $(findstring windows,$(OS)),.exe,) \
-				./cmd/$(target); \
+				-o $(DIST_DIR)/$(PROJECT_NAME)-$(OS)-$(ARCH)$(if $(ARM),v$(ARM))$(if $(findstring windows,$(OS)),.exe,) \
+				./$(target); \
 		) \
 	)
 	$(PACKAGE) Creating release archives...
