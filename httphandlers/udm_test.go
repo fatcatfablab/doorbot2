@@ -19,6 +19,15 @@ const (
 	udmUrl = "/udm"
 )
 
+type MockSender struct {
+	posted bool
+}
+
+func (s *MockSender) Post(_ context.Context, stats db.Stats) error {
+	s.posted = true
+	return nil
+}
+
 func udmReqBuilder(payload string) func(*testing.T) *http.Request {
 	return func(t *testing.T) *http.Request {
 		var buffer bytes.Buffer
@@ -45,7 +54,6 @@ func TestUdmRequest(t *testing.T) {
 		t.Fatalf("error creating db: %s", err)
 	}
 
-	mux := NewMux(accessDb, nil, nil)
 	origTs := time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc())
 	origNext := origTs.Add(24 * time.Hour)
 
@@ -54,6 +62,8 @@ func TestUdmRequest(t *testing.T) {
 		reqBuilder func(*testing.T) *http.Request
 		wantCode   int
 		wantStats  db.Stats
+		postSlack  bool
+		postDoord  bool
 	}{
 		{
 			name:       "Invalid json",
@@ -77,6 +87,8 @@ func TestUdmRequest(t *testing.T) {
 				Streak: 1,
 				Last:   origTs,
 			},
+			postSlack: true,
+			postDoord: true,
 		},
 		{
 			name: "Continue streak",
@@ -94,9 +106,14 @@ func TestUdmRequest(t *testing.T) {
 				Streak: 2,
 				Last:   origNext,
 			},
+			postSlack: true,
+			postDoord: true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			slackSender := MockSender{}
+			doordSender := MockSender{}
+			mux := NewMux(accessDb, &slackSender, &doordSender)
 			resp := httptest.NewRecorder()
 			mux.ServeHTTP(resp, tt.reqBuilder(t))
 
@@ -115,6 +132,17 @@ func TestUdmRequest(t *testing.T) {
 					log.Printf("got : %+v", got)
 					t.Errorf("stats differ")
 				}
+			}
+			if tt.postSlack != slackSender.posted {
+				log.Printf("want slack: %t", tt.postSlack)
+				log.Printf("got  slack: %t", slackSender.posted)
+				t.Errorf("unexpected slack call/no call")
+			}
+
+			if tt.postDoord != doordSender.posted {
+				log.Printf("want doord: %t", tt.postDoord)
+				log.Printf("got  doord: %t", doordSender.posted)
+				t.Errorf("unexpected doord call/no call")
 			}
 		})
 	}
