@@ -194,3 +194,97 @@ func TestAddRecord(t *testing.T) {
 		})
 	}
 }
+
+func TestDumpHistory(t *testing.T) {
+	ctx := context.Background()
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-dumpHistory.sqlite"), tz)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	loc := db.loc
+	want := []AccessRecord{
+		{Timestamp: time.Date(2020, 1, 1, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 2, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 3, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 13, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 14, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 8, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 9, 12, 0, 0, 0, loc), Name: username, AccessGranted: false},
+	}
+	for _, r := range want {
+		_, _, err := db.AddRecord(ctx, r)
+		if err != nil {
+			t.Fatalf("unexpected error adding record: %s", err)
+		}
+	}
+
+	got, err := db.DumpHistory(ctx, "some unknown username")
+	if len(got) != 0 {
+		t.Errorf("unexpected history for unknown username")
+	}
+
+	got, err = db.DumpHistory(ctx, username)
+	if len(got) != len(want) {
+		t.Errorf("different history lengths")
+	}
+
+	for i := range len(got) {
+		// Need to make sure the location objects are the same one in order to
+		// compare.
+		got[i].Timestamp = got[i].Timestamp.In(loc)
+		if got[i] != want[i] {
+			log.Printf("want: %+v", want[i])
+			log.Printf("got : %+v", got[i])
+			t.Errorf("element in history differ")
+		}
+	}
+}
+
+func TestRecompute(t *testing.T) {
+	ctx := context.Background()
+	db, err := New(path.Join(t.TempDir(), "doorbot2-test-recompute.sqlite"), tz)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	loc := db.loc
+	records := []AccessRecord{
+		{Timestamp: time.Date(2020, 1, 1, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 2, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 3, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 13, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 7, 14, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 8, 12, 0, 0, 0, loc), Name: username, AccessGranted: true},
+		{Timestamp: time.Date(2020, 1, 9, 12, 0, 0, 0, loc), Name: username, AccessGranted: false},
+	}
+	for _, r := range records {
+		_, _, err := db.AddRecord(ctx, r)
+		if err != nil {
+			t.Fatalf("unexpected error adding record: %s", err)
+		}
+	}
+
+	want := Stats{
+		Name:   username,
+		Total:  5,
+		Streak: 2,
+		Last:   time.Date(2020, 1, 8, 12, 0, 0, 0, loc),
+	}
+
+	got, err := db.Recompute(ctx, username)
+	if err != nil {
+		t.Errorf("unexpected error calling recompute: %s", err)
+	}
+
+	got.Last = got.Last.In(loc)
+	if got != want {
+		log.Printf("want: %+v", want)
+		log.Printf("got : %+v", got)
+		t.Errorf("stats differ")
+	}
+}
