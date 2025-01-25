@@ -2,6 +2,8 @@ package wsreader
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,7 +14,6 @@ import (
 	"github.com/fatcatfablab/doorbot2/types"
 
 	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 )
 
 const (
@@ -66,20 +67,25 @@ func connect(host, token string, hc *http.Client) (*websocket.Conn, error) {
 // StartReader only returns when ctx is Done
 func (w *WsReader) StartReader(ctx context.Context) error {
 	for {
-		select {
-		case <-ctx.Done():
-			return w.conn.Close(websocket.StatusNormalClosure, "")
-		default:
-			var msg wsMsg
-			if err := wsjson.Read(ctx, w.conn, &msg); err != nil {
-				// Ignore any errors decoding here because several different messages
-				// can be read and we don't necessarily care about them.
-				continue
+		// Can't use `wsjson.Read` here because it'll close the connection
+		// on decoding errors, and we expect errors here because the
+		// messages received are heterogeneous.
+		_, reader, err := w.conn.Reader(ctx)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
 			}
+			return fmt.Errorf("error reading from websocket: %s", err)
+		}
 
-			if err := w.processMsg(ctx, &msg); err != nil {
-				log.Printf("error dealing with message: %s", err)
-			}
+		var msg wsMsg
+		j := json.NewDecoder(reader)
+		if err := j.Decode(&msg); err != nil {
+			continue
+		}
+
+		if err := w.processMsg(ctx, &msg); err != nil {
+			log.Printf("error dealing with message: %s", err)
 		}
 
 	}
