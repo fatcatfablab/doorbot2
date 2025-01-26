@@ -3,47 +3,21 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"time"
 
-	"github.com/coder/websocket"
+	"github.com/fatcatfablab/doorbot2/types"
+	"github.com/fatcatfablab/doorbot2/wsreader"
 	"github.com/spf13/cobra"
 )
 
 const path = "/api/v1/developer/devices/notifications"
 const event = "access.logs.add"
 
-type wsMsg struct {
-	Event string `json:"event"`
-	Data  wsData `json:"data"`
-}
-
-type wsData struct {
-	Source wsSource `json:"_source"`
-}
-
-type wsSource struct {
-	Actor wsActor `json:"actor"`
-	Event wsEvent `json:"event"`
-}
-
-type wsActor struct {
-	Id          string `json:"id"`
-	DisplayName string `json:"display_name"`
-	AlternateId string `json:"alternate_id"`
-}
-
-type wsEvent struct {
-	Type   string `json:"type"`
-	Result string `json:"result"`
-}
-
 var (
-	wsAddr string
+	wsAddr  string
+	wsToken string
 
 	wsCmd = &cobra.Command{
 		Use:   "ws",
@@ -53,16 +27,20 @@ var (
 )
 
 func init() {
-	wsCmd.PersistentFlags().StringVar(&wsAddr, "addr", "localhost:8080", "http service address")
+	pf := wsCmd.PersistentFlags()
+	pf.StringVar(&wsAddr, "wsAddr", "localhost:8080", "http service address")
+	pf.StringVar(&wsToken, "token", os.Getenv("DOORBOT2_WS_TOKEN"), "auth token")
 	rootCmd.AddCommand(wsCmd)
 }
 
-func ws(cmd *cobra.Command, args []string) {
-	u := url.URL{Scheme: "wss", Host: wsAddr, Path: path}
-	log.Printf("connecting to %s", u.String())
+type dummySender struct{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func (d *dummySender) Post(ctx context.Context, s types.Stats) error {
+	log.Printf("dummySender called with: %+v", s)
+	return nil
+}
+
+func ws(_ *cobra.Command, _ []string) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -70,41 +48,14 @@ func ws(cmd *cobra.Command, args []string) {
 			},
 		},
 	}
-	opts := websocket.DialOptions{
-		HTTPHeader: http.Header{
-			"Authorization": {"Bearer " + os.Getenv("UA_TOKEN")},
-			"Upgrade":       {"websocket"},
-			"Connection":    {"Upgrade"},
-		},
-		HTTPClient: httpClient,
-	}
-	c, _, err := websocket.Dial(ctx, u.String(), &opts)
+
+	dummy := dummySender{}
+	wr, err := wsreader.New(wsAddr, wsToken, httpClient, accessDb, &dummy, &dummy)
 	if err != nil {
+		log.Fatalf("error initializing websocket reader: %s", err)
+	}
+
+	if err := wr.StartReader(context.Background()); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseNow()
-
-	for {
-		_, r, err := c.Reader(context.Background())
-		if err != nil {
-			log.Printf("error reading from websocket: %s", err)
-			continue
-		}
-
-		var msg wsMsg
-		j := json.NewDecoder(r)
-		if err := j.Decode(&msg); err != nil {
-			continue
-		}
-
-		processMsg(msg)
-	}
-}
-
-func processMsg(msg wsMsg) {
-	if msg.Event != event {
-		log.Printf("%s received. Ignoring", msg.Event)
-		return
-	}
-	log.Printf("%+v", msg)
 }
