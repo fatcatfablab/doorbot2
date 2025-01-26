@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -67,7 +67,7 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		ts = time.Now()
 	}
 
-	r := db.AccessRecord{
+	r := types.AccessRecord{
 		Timestamp:     ts,
 		Name:          msg.Data.Actor.Name,
 		AccessGranted: msg.Data.Object.Result == granted,

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 	"github.com/slack-go/slack"
 )
 
@@ -64,7 +64,7 @@ func NewSlack(channel, token string) *SlackSender {
 	return &SlackSender{client: client, channel: channel}
 }
 
-func (s *SlackSender) Post(ctx context.Context, stats db.Stats) error {
+func (s *SlackSender) Post(ctx context.Context, stats types.Stats) error {
 	c, ts, err := s.client.PostMessageContext(
 		ctx,
 		s.channel,
@@ -78,7 +78,7 @@ func (s *SlackSender) Post(ctx context.Context, stats db.Stats) error {
 	return nil
 }
 
-func statsToString(stats db.Stats) string {
+func statsToString(stats types.Stats) string {
 	tBadge, tEarned := getTotalBadge(stats.Total)
 	sBadge, sEarned := getStreakBadge(stats.Streak)
 

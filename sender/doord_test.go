@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -26,13 +26,13 @@ func TestPost(t *testing.T) {
 
 	for _, tt := range []struct {
 		name          string
-		stats         db.Stats
+		stats         types.Stats
 		server        *httptest.Server
 		errorExpected string
 	}{
 		{
 			name:  "UTC",
-			stats: db.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 0, 0, 0, time.UTC)},
+			stats: types.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 0, 0, 0, time.UTC)},
 			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				want := "01/21/2025,12:00:00,Johnny Melavo,1"
 
@@ -59,7 +59,7 @@ func TestPost(t *testing.T) {
 		},
 		{
 			name:  "America/New_York",
-			stats: db.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 4, 9, 0, nyLoc)},
+			stats: types.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 4, 9, 0, nyLoc)},
 			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					t.Errorf("unexpected method")
@@ -82,7 +82,7 @@ func TestPost(t *testing.T) {
 		},
 		{
 			name:  "Invisible nsec",
-			stats: db.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 4, 9, 1235858, nyLoc)},
+			stats: types.Stats{Name: username, Last: time.Date(2025, 1, 21, 12, 4, 9, 1235858, nyLoc)},
 			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					t.Errorf("unexpected method")
@@ -105,7 +105,7 @@ func TestPost(t *testing.T) {
 		},
 		{
 			name:          "Error",
-			stats:         db.Stats{},
+			stats:         types.Stats{},
 			errorExpected: "doord request returned: 400 Bad Request",
 			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
@@ -149,7 +149,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatalf("error parsing httptest server url: %s", err)
 	}
 	d := NewDoord(u)
-	err = d.Post(ctx, db.Stats{})
+	err = d.Post(ctx, types.Stats{})
 	if err == nil {
 		t.Error("client didn't error")
 	}

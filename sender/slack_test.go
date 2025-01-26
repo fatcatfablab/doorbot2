@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -15,12 +15,12 @@ const (
 func TestStatsToString(t *testing.T) {
 	for _, tt := range []struct {
 		name  string
-		stats db.Stats
+		stats types.Stats
 		want  string
 	}{
 		{
 			name:  "First visit",
-			stats: db.Stats{Name: name, Total: 1, Streak: 1},
+			stats: types.Stats{Name: name, Total: 1, Streak: 1},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d",
 				name, ":fatcat:", 1, ":cat2:", 1,
@@ -28,7 +28,7 @@ func TestStatsToString(t *testing.T) {
 		},
 		{
 			name:  "5 streak",
-			stats: db.Stats{Name: name, Total: 5, Streak: 5},
+			stats: types.Stats{Name: name, Total: 5, Streak: 5},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d\nOne dedicated cat!",
 				name, ":fatcat:", 5, ":black_cat:", 5,
@@ -36,7 +36,7 @@ func TestStatsToString(t *testing.T) {
 		},
 		{
 			name:  "UNO medal",
-			stats: db.Stats{Name: name, Total: 7, Streak: 2},
+			stats: types.Stats{Name: name, Total: 7, Streak: 2},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d\n:tada: Achievement unlocked! You get the UNO medal: :fatcat-yellow:",
 				name, ":fatcat-yellow:", 7, ":cat2:", 2,
@@ -44,7 +44,7 @@ func TestStatsToString(t *testing.T) {
 		},
 		{
 			name:  "medal and streak achievements",
-			stats: db.Stats{Name: name, Total: 31, Streak: 14},
+			stats: types.Stats{Name: name, Total: 31, Streak: 14},
 			want: fmt.Sprintf(
 				"%s %s %d %s %d"+
 					"\n:tada: Achievement unlocked! You get the TEENSY medal: :fatcat-green:"+

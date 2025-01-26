@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -23,7 +24,7 @@ type MockSender struct {
 	posted bool
 }
 
-func (s *MockSender) Post(_ context.Context, stats db.Stats) error {
+func (s *MockSender) Post(_ context.Context, stats types.Stats) error {
 	s.posted = true
 	return nil
 }
@@ -61,7 +62,7 @@ func TestUdmRequest(t *testing.T) {
 		name       string
 		reqBuilder func(*testing.T) *http.Request
 		wantCode   int
-		wantStats  db.Stats
+		wantStats  types.Stats
 		postSlack  bool
 		postDoord  bool
 	}{
@@ -69,7 +70,7 @@ func TestUdmRequest(t *testing.T) {
 			name:       "Invalid json",
 			reqBuilder: udmReqBuilder("invalid json"),
 			wantCode:   http.StatusBadRequest,
-			wantStats:  db.Stats{},
+			wantStats:  types.Stats{},
 		},
 		{
 			name: "Valid request",
@@ -81,7 +82,7 @@ func TestUdmRequest(t *testing.T) {
 				TimeForTesting: &origTs,
 			}),
 			wantCode: http.StatusOK,
-			wantStats: db.Stats{
+			wantStats: types.Stats{
 				Name:   username,
 				Total:  1,
 				Streak: 1,
@@ -100,7 +101,7 @@ func TestUdmRequest(t *testing.T) {
 				TimeForTesting: &origNext,
 			}),
 			wantCode: http.StatusOK,
-			wantStats: db.Stats{
+			wantStats: types.Stats{
 				Name:   username,
 				Total:  2,
 				Streak: 2,
@@ -119,7 +120,7 @@ func TestUdmRequest(t *testing.T) {
 				TimeForTesting: &origNext,
 			}),
 			wantCode:  http.StatusNoContent,
-			wantStats: db.Stats{},
+			wantStats: types.Stats{},
 			postSlack: false,
 			postDoord: false,
 		},

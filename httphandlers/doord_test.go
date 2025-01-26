@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -44,20 +45,20 @@ func TestDoordRequest(t *testing.T) {
 		name       string
 		reqBuilder func(*testing.T) *http.Request
 		wantCode   int
-		wantStats  db.Stats
+		wantStats  types.Stats
 		postSlack  bool
 	}{
 		{
 			name:       "Invalid json",
 			reqBuilder: doordReqBuilder("invalid json"),
 			wantCode:   http.StatusBadRequest,
-			wantStats:  db.Stats{},
+			wantStats:  types.Stats{},
 		},
 		{
 			name:       "Valid request",
 			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-20T00:20:09.760614","name":"xx","access_granted":true}`),
 			wantCode:   http.StatusOK,
-			wantStats: db.Stats{
+			wantStats: types.Stats{
 				Name:   username,
 				Total:  1,
 				Streak: 1,
@@ -69,7 +70,7 @@ func TestDoordRequest(t *testing.T) {
 			name:       "Continue streak",
 			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-21T00:20:09.760614","name":"xx","access_granted":true}`),
 			wantCode:   http.StatusOK,
-			wantStats: db.Stats{
+			wantStats: types.Stats{
 				Name:   username,
 				Total:  2,
 				Streak: 2,
@@ -81,7 +82,7 @@ func TestDoordRequest(t *testing.T) {
 			name:       "Access denied doesn't post",
 			reqBuilder: doordReqBuilder(`{"timestamp":"2025-01-21T00:20:09.760614","name":"xx","access_granted":false}`),
 			wantCode:   http.StatusNoContent,
-			wantStats:  db.Stats{},
+			wantStats:  types.Stats{},
 			postSlack:  false,
 		},
 	} {

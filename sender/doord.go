@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -26,7 +26,7 @@ func NewDoord(url *url.URL) *DoordSender {
 	return &DoordSender{url: url, client: &http.Client{Timeout: 2 * time.Second}}
 }
 
-func (d *DoordSender) Post(ctx context.Context, stats db.Stats) error {
+func (d *DoordSender) Post(ctx context.Context, stats types.Stats) error {
 	var b bytes.Buffer
 	fmt.Fprintf(
 		&b,

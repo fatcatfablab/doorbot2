@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/fatcatfablab/doorbot2/types"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -38,19 +39,6 @@ type dbh interface {
 }
 
 type dbKey struct{}
-
-type Stats struct {
-	Name   string    `json:"name"`
-	Total  uint      `json:"total"`
-	Streak uint      `json:"streak"`
-	Last   time.Time `json:"last"`
-}
-
-type AccessRecord struct {
-	Timestamp     time.Time `json:"timestamp"`
-	Name          string    `json:"name"`
-	AccessGranted bool      `json:"access_granted"`
-}
 
 type date struct {
 	year  int
@@ -102,7 +90,7 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
+func (db *DB) Update(ctx context.Context, r types.Stats) (types.Stats, error) {
 	_, err := db.getDbh(ctx).ExecContext(
 		ctx,
 		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
@@ -118,21 +106,21 @@ func (db *DB) Update(ctx context.Context, r Stats) (Stats, error) {
 	return r, err
 }
 
-func (db *DB) bumpWithTimestamp(ctx context.Context, name string, ts time.Time) (Stats, bool, error) {
+func (db *DB) bumpWithTimestamp(ctx context.Context, name string, ts time.Time) (types.Stats, bool, error) {
 	lastStats, err := db.Get(ctx, name)
 	if err != nil {
-		return Stats{}, false, fmt.Errorf("error retrieving record: %w", err)
+		return types.Stats{}, false, fmt.Errorf("error retrieving record: %w", err)
 	}
 
 	newStats, err := db.Update(ctx, bumpStats(lastStats, ts))
 	if err != nil {
-		return Stats{}, false, fmt.Errorf("error updating record: %w", err)
+		return types.Stats{}, false, fmt.Errorf("error updating record: %w", err)
 	}
 
 	return newStats, newStats.Total != lastStats.Total, nil
 }
 
-func bumpStats(r Stats, ts time.Time) Stats {
+func bumpStats(r types.Stats, ts time.Time) types.Stats {
 	if r.Last.IsZero() {
 		r.Total = 1
 		r.Streak = 1
@@ -161,20 +149,20 @@ func bumpStats(r Stats, ts time.Time) Stats {
 	return r
 }
 
-func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
+func (db *DB) Get(ctx context.Context, name string) (types.Stats, error) {
 	row := db.getDbh(ctx).QueryRowContext(
 		ctx,
 		"SELECT name, total, streak, last FROM stats WHERE name = ?",
 		name,
 	)
 
-	var r Stats
+	var r types.Stats
 	var ts int64
 	if err := row.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.Name = name
 		} else {
-			return Stats{}, fmt.Errorf("error scanning row: %w", err)
+			return types.Stats{}, fmt.Errorf("error scanning row: %w", err)
 		}
 	} else {
 		r.Last = time.Unix(ts, 0)
@@ -183,10 +171,10 @@ func (db *DB) Get(ctx context.Context, name string) (Stats, error) {
 	return r, nil
 }
 
-func (db *DB) AddRecord(ctx context.Context, r AccessRecord) (s Stats, bumped bool, err error) {
+func (db *DB) AddRecord(ctx context.Context, r types.AccessRecord) (s types.Stats, bumped bool, err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
-		return Stats{}, false, fmt.Errorf("error starting tx: %w", err)
+		return types.Stats{}, false, fmt.Errorf("error starting tx: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -234,7 +222,7 @@ func (db *DB) Loc() *time.Location {
 	return db.loc
 }
 
-func (db *DB) DumpHistory(ctx context.Context, name string) ([]AccessRecord, error) {
+func (db *DB) DumpHistory(ctx context.Context, name string) ([]types.AccessRecord, error) {
 	rows, err := db.getDbh(ctx).QueryContext(
 		ctx,
 		"SELECT timestamp, name, access_granted FROM history WHERE name=? ORDER BY timestamp ASC",
@@ -244,9 +232,9 @@ func (db *DB) DumpHistory(ctx context.Context, name string) ([]AccessRecord, err
 		return nil, fmt.Errorf("error dumping history: %w", err)
 	}
 
-	result := make([]AccessRecord, 0)
+	result := make([]types.AccessRecord, 0)
 	for rows.Next() {
-		var r AccessRecord
+		var r types.AccessRecord
 		var ts int64
 		err = rows.Scan(&ts, &r.Name, &r.AccessGranted)
 		if err != nil {
@@ -260,10 +248,10 @@ func (db *DB) DumpHistory(ctx context.Context, name string) ([]AccessRecord, err
 	return result, nil
 }
 
-func (db *DB) Recompute(ctx context.Context, name string) (stats Stats, err error) {
+func (db *DB) Recompute(ctx context.Context, name string) (stats types.Stats, err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
-		return Stats{}, fmt.Errorf("error starting tx: %w", err)
+		return types.Stats{}, fmt.Errorf("error starting tx: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -281,7 +269,7 @@ func (db *DB) Recompute(ctx context.Context, name string) (stats Stats, err erro
 		name,
 	)
 	if err != nil {
-		return Stats{}, fmt.Errorf("can't delete stats: %w", err)
+		return types.Stats{}, fmt.Errorf("can't delete stats: %w", err)
 	}
 
 	records, err := db.DumpHistory(ctx, name)
@@ -291,13 +279,13 @@ func (db *DB) Recompute(ctx context.Context, name string) (stats Stats, err erro
 		}
 		stats, _, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
 		if err != nil {
-			return Stats{}, err
+			return types.Stats{}, err
 		}
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return Stats{}, fmt.Errorf("error commiting: %w", err)
+		return types.Stats{}, fmt.Errorf("error commiting: %w", err)
 	}
 
 	return stats, nil

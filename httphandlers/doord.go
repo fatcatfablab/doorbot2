@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fatcatfablab/doorbot2/db"
+	"github.com/fatcatfablab/doorbot2/types"
 )
 
 const (
@@ -46,7 +46,7 @@ func (h handlers) doordRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	r := db.AccessRecord{
+	r := types.AccessRecord{
 		Timestamp:     t,
 		Name:          msg.Name,
 		AccessGranted: msg.AccessGranted,
