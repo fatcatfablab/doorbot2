@@ -61,7 +61,7 @@ func start(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 
-	doord, slack := initSenders()
+	slack, doord := initSenders()
 
 	httpServer := initHttpServer(slack, doord)
 	go startHttpServer(&wg, httpServer)
