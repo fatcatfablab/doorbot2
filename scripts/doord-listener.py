@@ -8,13 +8,14 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 ADDR = ""
 PORT = 8080
+LOG  = "/var/log/doord.access.log"
 
 
 class DoorBotRequest(BaseHTTPRequestHandler):
     def do_POST(self):
         self.log_message("request received")
         file_length = int(self.headers["Content-Length"])
-        with open(sys.argv[1], "ab") as f:
+        with open(LOG, "ab") as f:
             f.write(self.rfile.read(file_length))
             f.write("\n".encode())
         self.send_response(HTTPStatus.OK)
