@@ -78,22 +78,24 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if s, bumped, err := h.db.AddRecord(req.Context(), r); err != nil {
+	s, bumped, err := h.db.AddRecord(req.Context(), r)
+	if err != nil {
 		log.Printf("error bumping %s: %s", msg.Data.Actor.Name, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else if bumped {
-		if h.slack != nil {
-			err = h.slack.Post(req.Context(), s)
-			if err != nil {
-				log.Printf("error posting message to slack: %s", err)
-			}
+	}
+
+	if bumped && h.slack != nil {
+		err = h.slack.Post(req.Context(), s)
+		if err != nil {
+			log.Printf("error posting message to slack: %s", err)
 		}
-		if h.doord != nil {
-			err = h.doord.Post(req.Context(), s)
-			if err != nil {
-				log.Printf("error posting message to doord: %s", err)
-			}
+	}
+
+	if h.doord != nil {
+		err = h.doord.Post(req.Context(), s)
+		if err != nil {
+			log.Printf("error posting message to doord: %s", err)
 		}
 	}
 

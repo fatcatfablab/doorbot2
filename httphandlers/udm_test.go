@@ -57,6 +57,7 @@ func TestUdmRequest(t *testing.T) {
 
 	origTs := time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc())
 	origNext := origTs.Add(24 * time.Hour)
+	origSame := origNext.Add(1 * time.Hour)
 
 	for _, tt := range []struct {
 		name       string
@@ -108,6 +109,25 @@ func TestUdmRequest(t *testing.T) {
 				Last:   origNext,
 			},
 			postSlack: true,
+			postDoord: true,
+		},
+		{
+			name: "Same day",
+			reqBuilder: udmReqBuilderFromMsg(udmMsg{
+				Data: udmMsgData{
+					Actor:  &udmActor{Name: username},
+					Object: &udmObject{Result: granted},
+				},
+				TimeForTesting: &origSame,
+			}),
+			wantCode: http.StatusOK,
+			wantStats: types.Stats{
+				Name:   username,
+				Total:  2,
+				Streak: 2,
+				Last:   origSame,
+			},
+			postSlack: false,
 			postDoord: true,
 		},
 		{

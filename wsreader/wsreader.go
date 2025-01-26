@@ -135,20 +135,21 @@ func (w *WsReader) processMsg(ctx context.Context, msg *wsMsg) error {
 		return nil
 	}
 
-	if s, bumped, err := w.db.AddRecord(ctx, r); err != nil {
+	s, bumped, err := w.db.AddRecord(ctx, r)
+	if err != nil {
 		return fmt.Errorf("error bumping %s: %s", r.Name, err)
-	} else if bumped {
-		if w.slack != nil {
-			err = w.slack.Post(ctx, s)
-			if err != nil {
-				log.Printf("error posting message to slack: %s", err)
-			}
+	}
+	if bumped && w.slack != nil {
+		err = w.slack.Post(ctx, s)
+		if err != nil {
+			log.Printf("error posting message to slack: %s", err)
 		}
-		if w.doord != nil {
-			err = w.doord.Post(ctx, s)
-			if err != nil {
-				log.Printf("error posting message to doord: %s", err)
-			}
+	}
+
+	if w.doord != nil {
+		err = w.doord.Post(ctx, s)
+		if err != nil {
+			log.Printf("error posting message to doord: %s", err)
 		}
 	}
 
