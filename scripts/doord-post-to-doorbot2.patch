@@ -1,45 +1,44 @@
-commit 475933eb01617a34929dce35298aa3e20466c740
-Author: Miquel Ruiz <self@miquelruiz.net>
-Date:   Wed Jan 22 21:29:54 2025 -0500
-
-    Post access records to doorbot2
-
 diff --git a/pythonmstk/pythonmstk.py b/pythonmstk/pythonmstk.py
-index cbae1f7..a22659c 100644
+index a22659c..718ec52 100644
 --- a/pythonmstk/pythonmstk.py
 +++ b/pythonmstk/pythonmstk.py
-@@ -22,6 +22,13 @@ from slack import WebClient # 1/17/22, XlogicX
- import ssl # 1/17/22, XlogicX
- ssl._create_default_https_context = ssl._create_unverified_context # 1/17/22, XlogicX, disables SSL verification, but civi doesn't very either, so...
- 
-+
-+from datetime import datetime
-+
-+
-+DOORBOT2_URL = "http://10.2.2.187:8080/doord"
-+
-+
- class MstkServer:
-    
-    def __init__(self, secrets_path,secrets_file):
-@@ -149,9 +156,19 @@ class MstkServer:
-          if streak == 365: badge_message += "\nYou DO live here! Welcome home.".format(badge2)
- 
+@@ -71,7 +71,7 @@ class MstkServer:
+       self.activity_logfile = ('/var/log/%s.activity.log' % daemon)
+       open(self.activity_logfile, 'a').close()
+       # RYAN
+-      self.debug_message(self.log_level,0, "test")
++      self.debug_message(self.log_level,0, "Restarted")
+       self.slack.chat_postMessage(channel=str(self.slack_channel),text="Void's grip released. Initiating connection to Slack. Resuming sentinel duty. New arrivals shall be announced once more.") # Fixed hardcoded slack channel
+
+    def debug_message(self,current_log_level, message_level, message):
+@@ -158,17 +158,19 @@ class MstkServer:
           if todays_entries == 0:
--            #logline = '{} {}{}, {}/{}:spiral_calendar_pad:{}'.format(entryname,badge1,badge2,len(date_integers),streak,badge_message)
              logline = '{} {} {} {} {}{}'.format(entryname,badge1,len(date_integers)+1,badge2,streak,badge_message) # Updated doorbot msg post format - 1/22/22 DWC (And total Days Bug, XlogicX)
              self.slack.chat_postMessage(channel=str(slack_channel),text=logline) # Fixed hardcoded slack channel
-+            try:
-+               requests.post(
-+                  URL,
-+                  json={
-+                     "timestamp": datetime.now().isoformat(),
-+                     "name": entryname,
-+                     "access_granted": True,
-+                  },
-+               )
-+            except Exception as e:
-+               pass
- 
+-            try:
+-               requests.post(
+-                  URL,
+-                  json={
+-                     "timestamp": datetime.now().isoformat(),
+-                     "name": entryname,
+-                     "access_granted": True,
+-                  },
+-               )
+-            except Exception as e:
+-               pass
++
++         try:
++            r = requests.post(
++               DOORBOT2_URL,
++               json={
++                  "timestamp": datetime.now().isoformat(),
++                  "name": entryname,
++                  "access_granted": True,
++               },
++            )
++            r.raise_for_status()
++         except Exception as e:
++            self.debug_message(self.log_level, 3, f"error sending access log to doorbot2: {e}")
+
           currenttime  = time.strftime("%H:%M:%S") # XlogicX debugging
           debugfile = open("/var/log/doorbotdebug.txt", "a"); # XlogicX debugging
