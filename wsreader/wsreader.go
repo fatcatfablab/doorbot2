@@ -1,10 +1,12 @@
 package wsreader
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,8 +19,9 @@ import (
 )
 
 const (
-	path    = "/api/v1/developer/devices/notifications"
-	granted = "GRANTED"
+	path        = "/api/v1/developer/devices/notifications"
+	granted     = "ACCESS"
+	accessEvent = "access.logs.add"
 )
 
 type WsReader struct {
@@ -67,20 +70,41 @@ func connect(host, token string, hc *http.Client) (*websocket.Conn, error) {
 // StartReader only returns when ctx is Done
 func (w *WsReader) StartReader(ctx context.Context) error {
 	for {
+		var err error
 		// Can't use `wsjson.Read` here because it'll close the connection
-		// on decoding errors, and we expect errors here because the
+		// on decoding errors, and we expect errors there because the
 		// messages received are heterogeneous.
-		_, reader, err := w.conn.Reader(ctx)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return nil
+		_, reader, readerErr := w.conn.Reader(ctx)
+		if readerErr != nil {
+			if !errors.Is(ctx.Err(), context.Canceled) {
+				err = fmt.Errorf("error reading from websocket: %s", readerErr)
 			}
-			return fmt.Errorf("error reading from websocket: %s", err)
+
+			// break only if there's no reader, otherwise we need to read
+			// from it.
+			if reader == nil {
+				return err
+			}
+		}
+
+		var buf bytes.Buffer
+		if _, err := io.Copy(&buf, reader); err != nil {
+			return fmt.Errorf("error copying ws reader: %s", err)
 		}
 
 		var msg wsMsg
-		j := json.NewDecoder(reader)
+		j := json.NewDecoder(&buf)
 		if err := j.Decode(&msg); err != nil {
+			if readerErr != nil {
+				return readerErr
+			}
+			continue
+		}
+
+		if msg.Event != accessEvent {
+			if readerErr != nil {
+				return readerErr
+			}
 			continue
 		}
 
@@ -88,10 +112,19 @@ func (w *WsReader) StartReader(ctx context.Context) error {
 			log.Printf("error dealing with message: %s", err)
 		}
 
+		// If we got an error at the start of the loop, break here after all
+		// the reading has happened because if there's data left in the reader
+		// the connection will hang.
+		if readerErr != nil {
+			log.Print("returning because there was an error")
+			return err
+		}
 	}
+
 }
 
 func (w *WsReader) processMsg(ctx context.Context, msg *wsMsg) error {
+	log.Printf("Processing ws msg: %+v", *msg)
 	r := types.AccessRecord{
 		Timestamp:     time.Now(),
 		Name:          msg.Data.Source.Actor.DisplayName,

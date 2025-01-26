@@ -148,7 +148,7 @@ func initWsReader(slack, doord types.Sender) *wsreader.WsReader {
 // This function doesn't return until the context is cancelled.
 func startWsReader(ctx context.Context, wg *sync.WaitGroup, wr *wsreader.WsReader) {
 	if err := wr.StartReader(ctx); err != nil {
-		log.Fatalf("websocket errro: %s", err)
+		log.Fatalf("websocket error: %s", err)
 	} else {
 		log.Print("websocket closed gracefully")
 	}
