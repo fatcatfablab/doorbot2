@@ -11,12 +11,17 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/fatcatfablab/doorbot2/httphandlers"
 	"github.com/fatcatfablab/doorbot2/sender"
 	"github.com/fatcatfablab/doorbot2/types"
 	"github.com/fatcatfablab/doorbot2/wsreader"
 	"github.com/spf13/cobra"
+)
+
+const (
+	wsRetry = 5 * time.Second
 )
 
 var (
@@ -67,8 +72,7 @@ func start(cmd *cobra.Command, args []string) {
 	go startHttpServer(&wg, httpServer)
 	wg.Add(1)
 
-	wsReader := initWsReader(slack, doord)
-	go startWsReader(ctx, &wg, wsReader)
+	go initWsReader(ctx, &wg, slack, doord)
 	wg.Add(1)
 
 	s := <-done
@@ -121,7 +125,9 @@ func startHttpServer(wg *sync.WaitGroup, s *http.Server) {
 	}
 }
 
-func initWsReader(slack, doord types.Sender) *wsreader.WsReader {
+// This function doesn't return until the context is cancelled. If it fails to
+// connect to the websocket, or if the connection dies, it retries after 10s.
+func initWsReader(ctx context.Context, wg *sync.WaitGroup, slack, doord types.Sender) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -130,27 +136,33 @@ func initWsReader(slack, doord types.Sender) *wsreader.WsReader {
 		},
 	}
 
-	wr, err := wsreader.New(
-		wsAddr,
-		wsToken,
-		httpClient,
-		accessDb,
-		slack,
-		doord,
-	)
-	if err != nil {
-		log.Fatalf("error initializing websocket reader: %s", err)
-	}
+	for {
+		if errors.Is(ctx.Err(), context.Canceled) {
+			break
+		}
 
-	return wr
-}
+		wr, err := wsreader.New(
+			wsAddr,
+			wsToken,
+			httpClient,
+			accessDb,
+			slack,
+			doord,
+		)
+		if err != nil {
+			log.Printf("error initializing websocket reader: %s", err)
+			time.Sleep(wsRetry)
+			continue
+		}
 
-// This function doesn't return until the context is cancelled.
-func startWsReader(ctx context.Context, wg *sync.WaitGroup, wr *wsreader.WsReader) {
-	if err := wr.StartReader(ctx); err != nil {
-		log.Fatalf("websocket error: %s", err)
-	} else {
+		if err := wr.StartReader(ctx); err != nil {
+			log.Printf("websocket error: %s", err)
+			time.Sleep(wsRetry)
+			continue
+		}
+
 		log.Print("websocket closed gracefully")
 	}
+
 	wg.Done()
 }
