@@ -92,12 +92,5 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if h.doord != nil {
-		err = h.doord.Post(req.Context(), s)
-		if err != nil {
-			log.Printf("error posting message to doord: %s", err)
-		}
-	}
-
 	w.WriteHeader(http.StatusOK)
 }

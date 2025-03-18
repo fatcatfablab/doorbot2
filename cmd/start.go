@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -66,13 +65,12 @@ func start(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 
-	slack, doord := initSenders()
-
-	httpServer := initHttpServer(slack, doord)
+	slack := sender.NewSlack(slackChannel, slackToken)
+	httpServer := initHttpServer(slack)
 	go startHttpServer(&wg, httpServer)
 	wg.Add(1)
 
-	go initWsReader(ctx, &wg, slack, doord)
+	go initWsReader(ctx, &wg, slack)
 	wg.Add(1)
 
 	s := <-done
@@ -86,21 +84,10 @@ func start(cmd *cobra.Command, args []string) {
 	wg.Wait()
 }
 
-func initSenders() (types.Sender, types.Sender) {
-	dUrl, err := url.Parse(doordUrl)
-	if err != nil {
-		log.Fatalf("failed to parse %s: %s", doordUrl, err)
-	}
-	doord := sender.NewDoord(dUrl)
-	slack := sender.NewSlack(slackChannel, slackToken)
-
-	return slack, doord
-}
-
-func initHttpServer(slack, doord types.Sender) *http.Server {
+func initHttpServer(slack types.Sender) *http.Server {
 	return &http.Server{
 		Addr:    httpAddr,
-		Handler: httphandlers.NewMux(accessDb, slack, doord),
+		Handler: httphandlers.NewMux(accessDb, slack),
 	}
 }
 
@@ -127,7 +114,7 @@ func startHttpServer(wg *sync.WaitGroup, s *http.Server) {
 
 // This function doesn't return until the context is cancelled. If it fails to
 // connect to the websocket, or if the connection dies, it retries after 10s.
-func initWsReader(ctx context.Context, wg *sync.WaitGroup, slack, doord types.Sender) {
+func initWsReader(ctx context.Context, wg *sync.WaitGroup, slack types.Sender) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -147,7 +134,6 @@ func initWsReader(ctx context.Context, wg *sync.WaitGroup, slack, doord types.Se
 			httpClient,
 			accessDb,
 			slack,
-			doord,
 		)
 		if err != nil {
 			log.Printf("error initializing websocket reader: %s", err)

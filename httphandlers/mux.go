@@ -10,13 +10,11 @@ import (
 type handlers struct {
 	db    *db.DB
 	slack types.Sender
-	doord types.Sender
 }
 
-func NewMux(accessDb *db.DB, slack types.Sender, doord types.Sender) *http.ServeMux {
-	h := handlers{db: accessDb, slack: slack, doord: doord}
+func NewMux(accessDb *db.DB, slack types.Sender) *http.ServeMux {
+	h := handlers{db: accessDb, slack: slack}
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /doord", h.doordRequest)
 	mux.HandleFunc("POST /udm", h.udmRequest)
 	return mux
 }

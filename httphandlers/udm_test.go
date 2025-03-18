@@ -17,7 +17,9 @@ import (
 )
 
 const (
-	udmUrl = "/udm"
+	udmUrl   = "/udm"
+	username = "dummy username"
+	tz       = "America/New_York"
 )
 
 type MockSender struct {
@@ -65,7 +67,6 @@ func TestUdmRequest(t *testing.T) {
 		wantCode   int
 		wantStats  types.Stats
 		postSlack  bool
-		postDoord  bool
 	}{
 		{
 			name:       "Invalid json",
@@ -90,7 +91,6 @@ func TestUdmRequest(t *testing.T) {
 				Last:   origTs,
 			},
 			postSlack: true,
-			postDoord: true,
 		},
 		{
 			name: "Continue streak",
@@ -109,7 +109,6 @@ func TestUdmRequest(t *testing.T) {
 				Last:   origNext,
 			},
 			postSlack: true,
-			postDoord: true,
 		},
 		{
 			name: "Same day",
@@ -128,7 +127,6 @@ func TestUdmRequest(t *testing.T) {
 				Last:   origSame,
 			},
 			postSlack: false,
-			postDoord: true,
 		},
 		{
 			name: "Access denied doesn't post",
@@ -142,13 +140,11 @@ func TestUdmRequest(t *testing.T) {
 			wantCode:  http.StatusNoContent,
 			wantStats: types.Stats{},
 			postSlack: false,
-			postDoord: false,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			slackSender := MockSender{}
-			doordSender := MockSender{}
-			mux := NewMux(accessDb, &slackSender, &doordSender)
+			mux := NewMux(accessDb, &slackSender)
 			resp := httptest.NewRecorder()
 			mux.ServeHTTP(resp, tt.reqBuilder(t))
 
@@ -172,12 +168,6 @@ func TestUdmRequest(t *testing.T) {
 				log.Printf("want slack: %t", tt.postSlack)
 				log.Printf("got  slack: %t", slackSender.posted)
 				t.Errorf("unexpected slack call/no call")
-			}
-
-			if tt.postDoord != doordSender.posted {
-				log.Printf("want doord: %t", tt.postDoord)
-				log.Printf("got  doord: %t", doordSender.posted)
-				t.Errorf("unexpected doord call/no call")
 			}
 		})
 	}

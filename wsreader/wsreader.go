@@ -28,10 +28,9 @@ type WsReader struct {
 	db    *db.DB
 	conn  *websocket.Conn
 	slack types.Sender
-	doord types.Sender
 }
 
-func New(host, token string, hc *http.Client, db *db.DB, slack types.Sender, doord types.Sender) (*WsReader, error) {
+func New(host, token string, hc *http.Client, db *db.DB, slack types.Sender) (*WsReader, error) {
 	conn, err := connect(host, token, hc)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting websocket: %w", err)
@@ -41,7 +40,6 @@ func New(host, token string, hc *http.Client, db *db.DB, slack types.Sender, doo
 		db:    db,
 		conn:  conn,
 		slack: slack,
-		doord: doord,
 	}, nil
 }
 
@@ -120,7 +118,6 @@ func (w *WsReader) StartReader(ctx context.Context) error {
 			return err
 		}
 	}
-
 }
 
 func (w *WsReader) processMsg(ctx context.Context, msg *wsMsg) error {
@@ -145,13 +142,6 @@ func (w *WsReader) processMsg(ctx context.Context, msg *wsMsg) error {
 		err = w.slack.Post(ctx, s)
 		if err != nil {
 			log.Printf("error posting message to slack: %s", err)
-		}
-	}
-
-	if w.doord != nil {
-		err = w.doord.Post(ctx, s)
-		if err != nil {
-			log.Printf("error posting message to doord: %s", err)
 		}
 	}
 
