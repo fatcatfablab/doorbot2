@@ -73,7 +73,7 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		AccessGranted: msg.Data.Object.Result == granted,
 	}
 
-	if !r.AccessGranted {
+	if r.Name == "" || r.Name == "N/A" || !r.AccessGranted {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}

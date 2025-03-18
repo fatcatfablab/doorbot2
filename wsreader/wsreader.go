@@ -131,7 +131,9 @@ func (w *WsReader) processMsg(ctx context.Context, msg *wsMsg) error {
 		AccessGranted: msg.Data.Source.Event.Result == granted,
 	}
 
-	if msg.Data.Source.Actor.DisplayName == "" || !r.AccessGranted {
+	if msg.Data.Source.Actor.DisplayName == "" ||
+		msg.Data.Source.Actor.DisplayName == "N/A" ||
+		!r.AccessGranted {
 		return nil
 	}
 
