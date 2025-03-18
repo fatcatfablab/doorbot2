@@ -129,6 +129,19 @@ func TestUdmRequest(t *testing.T) {
 			postSlack: false,
 		},
 		{
+			name: "N/A doesn't post",
+			reqBuilder: udmReqBuilderFromMsg(udmMsg{
+				Data: udmMsgData{
+					Actor:  &udmActor{Name: "N/A"},
+					Object: &udmObject{Result: granted},
+				},
+				TimeForTesting: &origNext,
+			}),
+			wantCode:  http.StatusNoContent,
+			wantStats: types.Stats{},
+			postSlack: false,
+		},
+		{
 			name: "Access denied doesn't post",
 			reqBuilder: udmReqBuilderFromMsg(udmMsg{
 				Data: udmMsgData{
