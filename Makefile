@@ -322,7 +322,8 @@ build-all: $(DIST_DIR) ## Build for all platforms
 	for file in $(PROJECT_NAME)-* ; do \
 		if [ -f "$$file" ]; then \
 			init="-C ../init doorbot2.service"; \
-			tar --owner root --group root -czf "$$file.tar.gz" "$$file" $$init || exit 1; \
+			backup="-C ../scripts backup.sh"; \
+			tar --owner root --group root -czf "$$file.tar.gz" "$$file" $$init $$backup || exit 1; \
 			rm -f "$$file"; \
 		fi \
 	done
