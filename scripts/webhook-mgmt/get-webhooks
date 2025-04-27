@@ -1,0 +1,4 @@
+curl -s -k 'https://192.168.2.1:12445/api/v1/developer/webhooks/endpoints' \
+	-H "Authorization: Bearer $UDM_ADMIN_TOKEN" \
+	-H 'accept: application/json' \
+	-H 'content-type: application/json' | jq
