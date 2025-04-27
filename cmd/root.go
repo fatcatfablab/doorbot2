@@ -15,9 +15,9 @@ var accessDb *db.DB
 var rootCmd = &cobra.Command{
 	Use:   "doorbot2",
 	Short: "Doorbot2 announces arrivals to a slack channel",
-	Long: `Doorbot2 acts as a UniFi Access webhook endpoint.
-		   	When it receives an access message, stores it, calculates
-			some stats, and posts to a configured slack channel`,
+	Long: "Doorbot2 acts as a UniFi Access webhook endpoint.\n" +
+		"When it receives an access message, stores it, calculates" +
+		"some stats, and posts to a configured slack channel",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		accessDb, err = db.New(dbPath, tz)
