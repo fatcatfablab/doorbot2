@@ -24,6 +24,7 @@ var (
 	slackToken   string
 	slackChannel string
 	tz           string
+	silent       bool
 
 	startCmd = &cobra.Command{
 		Use:   "start",
@@ -41,6 +42,7 @@ func init() {
 	pf.StringVar(&slackToken, "slackToken", os.Getenv("DOORBOT2_SLACK_TOKEN"), "Slack token")
 	pf.StringVar(&slackChannel, "slackChannel", os.Getenv("DOORBOT2_SLACK_CHANNEL"), "Slack channel")
 	pf.StringVar(&tz, "timezone", "America/New_York", "Time zone")
+	pf.BoolVar(&silent, "silent", false, "Whether it should post to slack or not")
 
 	rootCmd.AddCommand(startCmd)
 }
@@ -50,7 +52,7 @@ func start(cmd *cobra.Command, args []string) {
 	signal.Notify(done, syscall.SIGINT)
 	wg := sync.WaitGroup{}
 
-	slack := sender.NewSlack(slackChannel, slackToken)
+	slack := sender.NewSlack(slackChannel, slackToken, silent)
 	httpServer := initHttpServer(slack)
 	go startHttpServer(&wg, httpServer)
 	wg.Add(1)

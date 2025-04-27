@@ -47,34 +47,41 @@ type badge struct {
 type SlackSender struct {
 	client  *slack.Client
 	channel string
+	silent  bool
 }
 
-func NewSlack(channel, token string) *SlackSender {
+func NewSlack(channel, token string, silent bool) *SlackSender {
 	client := slack.New(token)
-	c, ts, err := client.PostMessage(
-		channel,
-		slack.MsgOptionText(slackInitMsg, false),
-	)
-	if err != nil {
-		log.Printf("error posting to slack: %s", err)
-	} else {
-		log.Printf("slack message posted to %s at %s", c, ts)
-	}
 
-	return &SlackSender{client: client, channel: channel}
+	if !silent {
+		c, ts, err := client.PostMessage(
+			channel,
+			slack.MsgOptionText(slackInitMsg, false),
+		)
+		if err != nil {
+			log.Printf("error posting to slack: %s", err)
+		} else {
+			log.Printf("slack message posted to %s at %s", c, ts)
+		}
+	}
+	return &SlackSender{client: client, channel: channel, silent: silent}
 }
 
 func (s *SlackSender) Post(ctx context.Context, stats types.Stats) error {
-	c, ts, err := s.client.PostMessageContext(
-		ctx,
-		s.channel,
-		slack.MsgOptionText(statsToString(stats), false),
-	)
-	if err != nil {
-		return fmt.Errorf("error posting msg to slack: %w", err)
+	if !s.silent {
+		c, ts, err := s.client.PostMessageContext(
+			ctx,
+			s.channel,
+			slack.MsgOptionText(statsToString(stats), false),
+		)
+		if err != nil {
+			return fmt.Errorf("error posting msg to slack: %w", err)
+		}
+		log.Printf("Msg posted to %s (%s) at %s", s.channel, c, ts)
+	} else {
+		log.Printf("(silent mode) Msg NOT posted to %s", s.channel)
 	}
 
-	log.Printf("Msg posted to %s (%s) at %s", s.channel, c, ts)
 	return nil
 }
 
