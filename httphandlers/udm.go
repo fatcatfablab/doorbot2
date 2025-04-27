@@ -1,9 +1,7 @@
 package httphandlers
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"time"
@@ -45,20 +43,14 @@ type udmObject struct {
 }
 
 func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
-	var buffer bytes.Buffer
-	_, err := io.Copy(&buffer, req.Body)
-	if err != nil {
-		log.Printf("error copying body to buffer")
-	}
-	log.Printf("UDM request received: %s", buffer.String())
-
-	j := json.NewDecoder(&buffer)
+	j := json.NewDecoder(req.Body)
 	msg := udmMsg{}
 	if err := j.Decode(&msg); err != nil {
 		log.Printf("error parsing message: %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	log.Printf("Processing UDM message: %+v", msg)
 
 	var ts time.Time
 	if msg.TimeForTesting != nil {
