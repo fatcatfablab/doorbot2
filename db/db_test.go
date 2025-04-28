@@ -2,18 +2,46 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"log"
-	"path"
 	"testing"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/types"
+	"github.com/go-sql-driver/mysql"
 )
 
 const (
 	username = "Johnny Melavo"
 	tz       = "America/New_York"
 )
+
+func getDb(t *testing.T, dbName string) *DB {
+	c := mysql.NewConfig()
+	c.User = "root"
+	c.Params = make(map[string]string)
+	c.Params["loc"] = tz
+	c.Params["parseTime"] = "true"
+
+	sqlDB, err := sql.Open(driver, c.FormatDSN())
+	if err != nil {
+		t.Fatalf("can't connect to db: %s", err)
+	}
+	defer sqlDB.Close()
+
+	_, err = sqlDB.Exec("CREATE OR REPLACE DATABASE " + dbName)
+	if err != nil {
+		t.Fatalf("can't create database %s: %s", dbName, err)
+	}
+
+	c.DBName = dbName
+	db, err := New(c.FormatDSN(), tz)
+	if err != nil {
+		t.Fatalf("can't connect to test db: %s", err)
+	}
+
+	return db
+}
 
 func TestBumpStats(t *testing.T) {
 	loc, err := time.LoadLocation(tz)
@@ -67,10 +95,7 @@ func TestBumpStats(t *testing.T) {
 
 func TestUpdateAndGet(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-get.sqlite"), tz)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := getDb(t, "doorbot2_test_get")
 	defer db.Close()
 
 	ttime := time.Date(2025, 1, 17, 13, 0, 0, 0, db.loc)
@@ -115,10 +140,7 @@ func TestUpdateAndGet(t *testing.T) {
 
 func TestAddRecord(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-addEntry.sqlite"), tz)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := getDb(t, "doorbot2_test_addEntry")
 	defer db.Close()
 
 	loc := db.loc
@@ -199,10 +221,7 @@ func TestAddRecord(t *testing.T) {
 
 func TestDumpHistory(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-dumpHistory.sqlite"), tz)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := getDb(t, "doorbot2_test_dump")
 	defer db.Close()
 
 	loc := db.loc
@@ -224,11 +243,17 @@ func TestDumpHistory(t *testing.T) {
 	}
 
 	got, err := db.DumpHistory(ctx, "some unknown username")
+	if err != nil {
+		t.Errorf("error from DumpHistory: %s", err)
+	}
 	if len(got) != 0 {
 		t.Errorf("unexpected history for unknown username")
 	}
 
 	got, err = db.DumpHistory(ctx, username)
+	if err != nil {
+		t.Errorf("error from DumpHistory: %s", err)
+	}
 	if len(got) != len(want) {
 		t.Errorf("different history lengths")
 	}
@@ -247,10 +272,7 @@ func TestDumpHistory(t *testing.T) {
 
 func TestRecompute(t *testing.T) {
 	ctx := context.Background()
-	db, err := New(path.Join(t.TempDir(), "doorbot2-test-recompute.sqlite"), tz)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := getDb(t, "doorbot2_test_recompute")
 	defer db.Close()
 
 	loc := db.loc

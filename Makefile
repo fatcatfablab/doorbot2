@@ -180,7 +180,7 @@ build-target: generate
 			-ldflags '$(LD_FLAGS)' \
 			-gcflags '$(GCFLAGS)' \
 			-asmflags '$(ASMFLAGS)' \
-			-o $(BIN_DIR)/$(notdir $(TARGET)) \
+			-o $(BIN_DIR)/doorbot2 \
 			./$(TARGET); \
 	fi
 
