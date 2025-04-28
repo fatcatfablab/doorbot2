@@ -3,11 +3,11 @@ package httphandlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"strings"
 	"testing"
 	"time"
@@ -17,9 +17,11 @@ import (
 )
 
 const (
+	driver   = "mysql"
 	udmUrl   = "/udm"
 	username = "dummy username"
 	tz       = "America/New_York"
+	dsn      = "root@/"
 )
 
 type MockSender struct {
@@ -51,11 +53,29 @@ func udmReqBuilderFromMsg(msg udmMsg) func(*testing.T) *http.Request {
 	return udmReqBuilder(sb.String())
 }
 
-func TestUdmRequest(t *testing.T) {
-	accessDb, err := db.New(path.Join(t.TempDir(), "test-udm-request.sqlite"), tz)
+func getDb(t *testing.T, dbName string) *db.DB {
+	sqlDB, err := sql.Open(driver, dsn)
 	if err != nil {
-		t.Fatalf("error creating db: %s", err)
+		t.Fatalf("can't connect to db: %s", err)
 	}
+	defer sqlDB.Close()
+
+	_, err = sqlDB.Exec("CREATE OR REPLACE DATABASE " + dbName)
+	if err != nil {
+		t.Fatalf("can't create database %s: %s", dbName, err)
+	}
+
+	db, err := db.New(dsn+dbName, tz)
+	if err != nil {
+		t.Fatalf("can't connect to test db: %s", err)
+	}
+
+	return db
+}
+
+func TestUdmRequest(t *testing.T) {
+	accessDb := getDb(t, "test_udm_request")
+	defer accessDb.Close()
 
 	origTs := time.Date(2025, 1, 20, 0, 20, 9, 0, accessDb.Loc())
 	origNext := origTs.Add(24 * time.Hour)

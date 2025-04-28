@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dbPath string
+var dsn string
 var accessDb *db.DB
 
 var rootCmd = &cobra.Command{
@@ -20,7 +20,7 @@ var rootCmd = &cobra.Command{
 		"some stats, and posts to a configured slack channel",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		accessDb, err = db.New(dbPath, tz)
+		accessDb, err = db.New(dsn, tz)
 		if err != nil {
 			log.Fatalf("error opening database: %s", err)
 		}
@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&dbPath, "dbPath", "access.sqlite", "Path to the sqlite3 database")
+	rootCmd.PersistentFlags().StringVar(&dsn, "dsn", os.Getenv("DOORBOT2_DSN"), "DSN for the mysql database")
 }
 
 func Execute() {

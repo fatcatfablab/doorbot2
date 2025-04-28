@@ -14,6 +14,13 @@ on:
 
 jobs:
   build:
+    services:
+      mariadb:
+        image: mariadb
+        ports:
+          - "3306:3306"
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

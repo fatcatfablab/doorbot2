@@ -5,29 +5,29 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/types"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/go-sql-driver/mysql"
 )
 
 const (
-	driver   = "sqlite3"
-	initStmt = `
+	driver      = "mysql"
+	createStats = `
 CREATE TABLE IF NOT EXISTS stats (
-       name TEXT NOT NULL,
-       total INTEGER NOT NULL,
-	   streak INTEGER NOT NULL,
-	   last INTEGER NOT NULL,
-       PRIMARY KEY (name)
-) STRICT;
+	name VARCHAR(255) NOT NULL,
+	total INTEGER NOT NULL,
+	streak INTEGER NOT NULL,
+	last TIMESTAMP NOT NULL,
+	PRIMARY KEY (name)
+);`
+	createHistory = `
 CREATE TABLE IF NOT EXISTS history (
-               timestamp INTEGER NOT NULL,
-               name TEXT NOT NULL,
-               access_granted INTEGER NOT NULL,
-               PRIMARY KEY (timestamp, name)
-) STRICT;`
+	ts TIMESTAMP NOT NULL,
+	name VARCHAR(255) NOT NULL,
+	access_granted BOOL NOT NULL,
+	PRIMARY KEY (ts, name)
+);`
 )
 
 // This is the common interface between a *sql.DB and a *sql.Tx used here,
@@ -55,35 +55,39 @@ func newDate(year int, month time.Month, day int) date {
 	return date{year: year, month: month, day: day}
 }
 
-func New(path, tz string) (*DB, error) {
+func New(dsn, tz string) (*DB, error) {
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
 		return nil, fmt.Errorf("error loading tz %q: %w", tz, err)
 	}
 
-	db, err := sql.Open(driver, path)
+	conf, err := mysql.ParseDSN(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't open database: %w", err)
+		return nil, fmt.Errorf("error parsing dsn: %s", err)
 	}
 
-	finfo, err := os.Stat(path)
-	if err != nil || finfo.Size() == 0 {
-		if err := initializeDb(db); err != nil {
-			return nil, fmt.Errorf("error initializing database: %s", err)
-		}
-	}
+	// We rely on these being set, so set them here instead of expecting they've
+	// been properly configured
+	conf.Loc = loc
+	conf.ParseTime = true
 
-	_, err = db.Exec("PRAGMA journal_mode=WAL")
+	db, err := sql.Open(driver, conf.FormatDSN())
 	if err != nil {
-		return nil, fmt.Errorf("couldn't enable WAL mode: %w", err)
+		return nil, fmt.Errorf("couldn't connect to db: %w", err)
 	}
 
-	return &DB{db: db, loc: loc}, nil
+	d := &DB{db: db, loc: loc}
+	if err := d.initialize(); err != nil {
+		return nil, fmt.Errorf("error initializing db: %w", err)
+	}
+
+	return d, nil
 }
 
-func initializeDb(db *sql.DB) error {
-	_, err := db.Exec(initStmt)
-	return err
+func (db *DB) initialize() error {
+	_, err1 := db.db.Exec(createStats)
+	_, err2 := db.db.Exec(createHistory)
+	return errors.Join(err1, err2)
 }
 
 func (db *DB) Close() error {
@@ -94,14 +98,14 @@ func (db *DB) Update(ctx context.Context, r types.Stats) (types.Stats, error) {
 	_, err := db.getDbh(ctx).ExecContext(
 		ctx,
 		`INSERT INTO stats(name, total, streak, last) VALUES (?, ?, ?, ?)`+
-			`ON CONFLICT(name) DO UPDATE SET total=?, streak=?, last=?`,
+			`ON DUPLICATE KEY UPDATE total=?, streak=?, last=?`,
 		r.Name,
 		r.Total,
 		r.Streak,
-		r.Last.Unix(),
+		r.Last,
 		r.Total,
 		r.Streak,
-		r.Last.Unix(),
+		r.Last,
 	)
 	return r, err
 }
@@ -157,15 +161,12 @@ func (db *DB) Get(ctx context.Context, name string) (types.Stats, error) {
 	)
 
 	var r types.Stats
-	var ts int64
-	if err := row.Scan(&r.Name, &r.Total, &r.Streak, &ts); err != nil {
+	if err := row.Scan(&r.Name, &r.Total, &r.Streak, &r.Last); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.Name = name
 		} else {
 			return types.Stats{}, fmt.Errorf("error scanning row: %w", err)
 		}
-	} else {
-		r.Last = time.Unix(ts, 0)
 	}
 
 	return r, nil
@@ -185,22 +186,31 @@ func (db *DB) AddRecord(ctx context.Context, r types.AccessRecord) (s types.Stat
 		}
 	}()
 
+	bumped = false
 	ctx = context.WithValue(ctx, dbKey{}, tx)
 	_, err = tx.ExecContext(
 		ctx,
-		`INSERT INTO history(timestamp, name, access_granted) VALUES (?, ?, ?)`+
-			`ON CONFLICT(timestamp, name) DO UPDATE SET access_granted=?`,
-		r.Timestamp.Unix(),
+		`INSERT INTO history(ts, name, access_granted) VALUES (?, ?, ?)`+
+			`ON DUPLICATE KEY UPDATE access_granted=?`,
+		r.Timestamp,
 		r.Name,
 		r.AccessGranted,
 		r.AccessGranted,
 	)
+	if err != nil {
+		return s, bumped, fmt.Errorf("error running insert: %w", err)
+	}
 
-	bumped = false
 	if r.AccessGranted {
 		s, bumped, err = db.bumpWithTimestamp(ctx, r.Name, r.Timestamp)
+		if err != nil {
+			return s, bumped, fmt.Errorf("error calling bumpWithTimestamp: %w", err)
+		}
 	} else {
 		s, err = db.Get(ctx, r.Name)
+		if err != nil {
+			return s, bumped, fmt.Errorf("error calling db.Get: %w", err)
+		}
 	}
 
 	err = tx.Commit()
@@ -225,7 +235,7 @@ func (db *DB) Loc() *time.Location {
 func (db *DB) DumpHistory(ctx context.Context, name string) ([]types.AccessRecord, error) {
 	rows, err := db.getDbh(ctx).QueryContext(
 		ctx,
-		"SELECT timestamp, name, access_granted FROM history WHERE name=? ORDER BY timestamp ASC",
+		"SELECT ts, name, access_granted FROM history WHERE name=? ORDER BY ts ASC",
 		name,
 	)
 	if err != nil {
@@ -235,13 +245,10 @@ func (db *DB) DumpHistory(ctx context.Context, name string) ([]types.AccessRecor
 	result := make([]types.AccessRecord, 0)
 	for rows.Next() {
 		var r types.AccessRecord
-		var ts int64
-		err = rows.Scan(&ts, &r.Name, &r.AccessGranted)
+		err = rows.Scan(&r.Timestamp, &r.Name, &r.AccessGranted)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning row: %w", err)
 		}
-
-		r.Timestamp = time.Unix(ts, 0)
 		result = append(result, r)
 	}
 

@@ -34,7 +34,7 @@ type udmActor struct {
 }
 
 type udmObject struct {
-	AuthenticationType  string `json:"authentication_call"`
+	AuthenticationType  string `json:"authentication_type"`
 	AuthenticationValue string `json:"authentication_value"`
 	PolicyId            string `json:"policy_id"`
 	PolicyName          string `json:"policy_name"`
@@ -50,7 +50,18 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	log.Printf("Processing UDM message: %+v", msg)
+
+	if msg.Data.Object.AuthenticationType == "REX" {
+		log.Printf("Exit request")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	log.Printf(
+		"Processing UDM message: %+v %+v",
+		msg.Data.Actor,
+		msg.Data.Object,
+	)
 
 	var ts time.Time
 	if msg.TimeForTesting != nil {
