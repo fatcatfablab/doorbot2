@@ -107,7 +107,7 @@ func runMigration(src, dst *sql.DB, name string, migrateRow func(*sql.Tx) rowMig
 	return nil
 }
 
-func migrateTable(s *sql.DB, table string, f func(*sql.Rows) error) error {
+func migrateTable(s *sql.DB, table string, f rowMigrator) error {
 	log.Printf("Migrating table %q", table)
 
 	var num int64
