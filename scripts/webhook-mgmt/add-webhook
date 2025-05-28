@@ -4,7 +4,7 @@ curl -k -XPOST 'https://192.168.2.1:12445/api/v1/developer/webhooks/endpoints' \
 	-H 'content-type: application/json' \
 	--data '{
 		"name": "doorbot2",
-		"endpoint": "http://192.168.2.9:8080/udm",
+		"endpoint": "http://192.168.2.9:8082/udm",
 		"events": [
 			"access.door.unlock"
 		]
