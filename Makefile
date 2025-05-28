@@ -106,8 +106,7 @@ SKIP_PATTERN ?=
 
 # Cross-Compilation Targets
 PLATFORMS ?= \
-    linux/amd64 \
-    linux/arm/7/arm-linux-gnueabihf-gcc-10
+    linux/amd64
 
 # =============================================================================
 # 🎨 Terminal Colors & Emoji
