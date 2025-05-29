@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/fatcatfablab/doorbot2/types"
@@ -76,6 +77,12 @@ func New(dsn, tz string) (*DB, error) {
 		return nil, fmt.Errorf("couldn't connect to db: %w", err)
 	}
 
+	db.SetConnMaxLifetime(60 * time.Second)
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("can't ping the database: %w", err)
+	}
+
+	log.Printf("Connected to db")
 	d := &DB{db: db, loc: loc}
 	if err := d.initialize(); err != nil {
 		return nil, fmt.Errorf("error initializing db: %w", err)
