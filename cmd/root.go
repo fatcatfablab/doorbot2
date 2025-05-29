@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/fatcatfablab/doorbot2/db"
@@ -16,19 +15,8 @@ var rootCmd = &cobra.Command{
 	Use:   "doorbot2",
 	Short: "Doorbot2 announces arrivals to a slack channel",
 	Long: "Doorbot2 acts as a UniFi Access webhook endpoint.\n" +
-		"When it receives an access message, stores it, calculates" +
+		"When it receives an access message, stores it, calculates " +
 		"some stats, and posts to a configured slack channel",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-		accessDb, err = db.New(dsn, tz)
-		if err != nil {
-			log.Fatalf("error opening database: %s", err)
-		}
-		return err
-	},
-	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-		return accessDb.Close()
-	},
 }
 
 func init() {

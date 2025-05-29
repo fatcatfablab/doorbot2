@@ -9,6 +9,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/fatcatfablab/doorbot2/db"
 	"github.com/fatcatfablab/doorbot2/httphandlers"
 	"github.com/fatcatfablab/doorbot2/sender"
 	"github.com/fatcatfablab/doorbot2/types"
@@ -30,6 +31,17 @@ var (
 		Use:   "start",
 		Short: "Start duties",
 		Run:   start,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			accessDb, err = db.New(dsn, tz)
+			if err != nil {
+				log.Fatalf("error opening database: %s", err)
+			}
+			return err
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			return accessDb.Close()
+		},
 	}
 )
 

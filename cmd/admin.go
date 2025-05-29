@@ -16,6 +16,17 @@ var (
 	adminCmd = &cobra.Command{
 		Use:   "admin",
 		Short: "Admin actions on a doorbot2 database",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			accessDb, err = db.New(dsn, tz)
+			if err != nil {
+				log.Fatalf("error opening database: %s", err)
+			}
+			return err
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			return accessDb.Close()
+		},
 	}
 
 	dumpCmd = &cobra.Command{
