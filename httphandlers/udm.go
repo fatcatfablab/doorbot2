@@ -52,7 +52,7 @@ func (h handlers) udmRequest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if msg.Data.Object.AuthenticationType == "REX" {
-		log.Printf("Exit request")
+		// Exit request
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
